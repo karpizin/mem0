@@ -160,6 +160,7 @@ const ALLOWED_KEYS = [
   "topK",
   "oss",
   "skills",
+  "runtime",
 ];
 
 function assertAllowedKeys(
@@ -180,18 +181,24 @@ export const mem0ConfigSchema = {
     const cfg = value as Record<string, unknown>;
     assertAllowedKeys(cfg, ALLOWED_KEYS, "openclaw-mem0 config");
 
-    // Only two modes: "platform" (default) or "open-source"
+    // Accept "open-source", legacy "oss", and "runtime"; unknown values fall back to platform.
     if (
       typeof cfg.mode === "string" &&
       cfg.mode !== "platform" &&
-      cfg.mode !== "open-source"
+      cfg.mode !== "open-source" &&
+      cfg.mode !== "oss" &&
+      cfg.mode !== "runtime"
     ) {
       console.warn(
-        `[mem0] Unknown mode "${cfg.mode}" — expected "platform" or "open-source". Defaulting to "platform".`,
+        `[mem0] Unknown mode "${cfg.mode}" — expected "platform", "open-source", or "runtime". Defaulting to "platform".`,
       );
     }
     const mode: Mem0Mode =
-      cfg.mode === "open-source" ? "open-source" : "platform";
+      cfg.mode === "oss" || cfg.mode === "open-source"
+        ? "open-source"
+        : cfg.mode === "runtime"
+          ? "runtime"
+          : "platform";
 
     // Resolve API key: pluginConfig → fileConfig fallback (from openclaw.json plugin section)
     let resolvedApiKey =
@@ -207,10 +214,29 @@ export const mem0ConfigSchema = {
     // The plugin should register successfully and log a setup message.
     const needsSetup = mode === "platform" && !resolvedApiKey;
 
+    if (mode === "runtime") {
+      if (
+        !cfg.runtime ||
+        typeof cfg.runtime !== "object" ||
+        Array.isArray(cfg.runtime)
+      ) {
+        throw new Error("runtime config is required for runtime mode");
+      }
+    }
+
     // OpenClaw resolves ${VAR} in openclaw.json before register() — no plugin-side expansion needed
     let ossConfig: Mem0Config["oss"];
     if (cfg.oss && typeof cfg.oss === "object" && !Array.isArray(cfg.oss)) {
       ossConfig = cfg.oss as Mem0Config["oss"];
+    }
+
+    let runtimeConfig: Mem0Config["runtime"];
+    if (
+      cfg.runtime &&
+      typeof cfg.runtime === "object" &&
+      !Array.isArray(cfg.runtime)
+    ) {
+      runtimeConfig = cfg.runtime as Mem0Config["runtime"];
     }
 
     return {
@@ -258,6 +284,7 @@ export const mem0ConfigSchema = {
         !Array.isArray(cfg.skills)
           ? (cfg.skills as Mem0Config["skills"])
           : undefined,
+      runtime: runtimeConfig,
     };
   },
 };

@@ -1,6 +1,6 @@
 # @mem0/openclaw-mem0
 
-Long-term memory for [OpenClaw](https://github.com/openclaw/openclaw) agents, powered by [Mem0](https://mem0.ai).
+Long-term memory for [OpenClaw](https://github.com/openclaw/openclaw) agents, powered by [Mem0](https://mem0.ai) or an external `memory-runtime`.
 
 Your agent forgets everything between sessions. This plugin fixes that — it watches conversations, extracts what matters, and brings it back when relevant. Automatically.
 
@@ -63,6 +63,32 @@ Customize the embedder, vector store, or LLM via the `oss` block:
 All `oss` fields are optional. See the [Mem0 OSS docs](https://docs.mem0.ai/open-source/node-quickstart) for supported providers.
 
 ## How It Works
+
+### Runtime (Agent Memory Runtime)
+
+Use this mode when OpenClaw should talk to the standalone `memory-runtime` service instead of Mem0 Cloud or direct OSS SDKs.
+
+```json5
+"openclaw-mem0": {
+  "enabled": true,
+  "config": {
+    "mode": "runtime",
+    "userId": "alice",
+    "runtime": {
+      "baseUrl": "http://localhost:8080",
+      "apiKey": "${MEMORY_RUNTIME_API_KEY}",
+      "agentName": "primary"
+    }
+  }
+}
+```
+
+How it works in this mode:
+
+- the plugin bootstraps a namespace/agent scope through `POST /v1/adapters/openclaw/bootstrap`
+- auto-capture writes conversation turns through the runtime adapter events endpoint
+- search, list, get, and delete operate through the runtime adapter contract instead of direct Mem0 SDK calls
+- runtime-managed ids are encoded as stable OpenClaw memory ids, so existing tools continue to work
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/mem0ai/mem0/main/docs/images/openclaw-architecture.png" alt="Architecture" width="800" />
@@ -137,7 +163,7 @@ openclaw mem0 dream --dry-run
 
 | Key | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
-| `mode` | `"platform"` \| `"open-source"` | `"platform"` | Backend mode |
+| `mode` | `"platform"` \| `"open-source"` \| `"runtime"` | `"platform"` | Backend mode |
 | `userId` | `string` | OS username | User identifier. All memories scoped to this value. |
 | `autoRecall` | `boolean` | `true` | Inject relevant memories before each turn |
 | `autoCapture` | `boolean` | `true` | Extract and store facts after each turn |
@@ -166,6 +192,14 @@ All fields optional. Defaults: `text-embedding-3-small` embeddings, local SQLite
 | `oss.llm.provider` | `string` | `"openai"` | LLM provider |
 | `oss.llm.config` | `object` | — | Provider config (`apiKey`, `model`, `baseURL`) |
 | `oss.historyDbPath` | `string` | — | SQLite path for edit history |
+
+### Runtime mode
+
+| Key | Type | Default | Description |
+| --- | ---- | ------- | ----------- |
+| `runtime.baseUrl` | `string` | — | **Required.** Base URL of the `memory-runtime` service |
+| `runtime.apiKey` | `string` | — | Optional API key passed as `x-api-key` |
+| `runtime.agentName` | `string` | `"primary"` | Agent name used during bootstrap if runtime scope does not exist yet |
 
 ## License
 
