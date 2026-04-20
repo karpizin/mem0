@@ -13,7 +13,7 @@
 | `BL-001` | Make OpenClaw plugin recall timeout configurable and instrumented | `p1` | `Adapters / OpenClaw Contract` | `F-2026-04-21-001` | `yes` | Implemented on 2026-04-21; rerun showed partial mitigation at 15000ms, and low-value skip policy is now in place. Next step is trimming the remaining heavy recall path | `integration` |
 | `BL-002` | Improve live recall packing so durable architecture facts land in cleaner slots | `p2` | `Retrieval` | `pilot result notes` | `yes` | Tune slot assignment for infrastructure-oriented facts | `runtime` |
 | `BL-003` | Silence or formalize `plugins.allow` warning for trusted local plugin setup | `p3` | `Documentation / Runbooks` | `pilot logs` | `yes` | Document recommended allowlist config for live pilots | `docs` |
-| `BL-004` | Raise or optimize OpenClaw embedded agent timeout for continuity-heavy live scenarios | `p1` | `OpenClaw Runtime / Ops` | `F-2026-04-21-002` | `yes` | Reduce prompt weight and/or increase agent timeout before the next continuity-heavy rerun | `openclaw integration` |
+| `BL-004` | Raise or optimize OpenClaw embedded agent timeout for continuity-heavy live scenarios | `p1` | `OpenClaw Runtime / Ops` | `F-2026-04-21-002` | `yes` | Partial mitigation only: separate continuity timeout and explicit thinking controls now exist, but the rerun still hit `embedded run timeout` at `180000ms`. Next step is reducing prompt/build payload size or model/provider latency instead of only adding more timeout budget | `openclaw integration` |
 
 ## Priority Rules
 
@@ -62,4 +62,4 @@
 
 - `which scenarios must be rerun after fixes:` `durable architecture decision`, `active session carryover`, `cross-session continuity`
 - `which quality-eval checks must stay green:` full `memory-runtime` suite, `pilot-scenarios`, `pilot-negative-scenarios`, `openclaw-live-pilot`
-- `which metrics / traces should be compared before vs after:` plugin timeout frequency, recall trace selection patterns, live scenario pass rate, user-facing injected memory quality, and embedded agent timeout frequency
+- `which metrics / traces should be compared before vs after:` plugin timeout frequency, recall trace selection patterns, live scenario pass rate, user-facing injected memory quality, embedded agent timeout frequency, and prompt/system-payload size on heavy carryover or continuity turns

@@ -78,12 +78,42 @@ def test_run_openclaw_turn_raises_if_cli_process_hangs(monkeypatch) -> None:
             session_id="pilot-user-timeout",
             message="Ping",
             timeout_seconds=120,
+            thinking_level="off",
         )
     except RuntimeError as exc:
         assert "exceeded process timeout" in str(exc)
         assert "pilot-user-timeout" in str(exc)
     else:
         raise AssertionError("Expected RuntimeError for hung OpenClaw CLI process")
+
+
+def test_run_openclaw_turn_passes_thinking_level(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Completed:
+        returncode = 0
+        stdout = '{"payloads":[{"text":"Noted."}],"meta":{"stopReason":"stop"}}'
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return _Completed()
+
+    monkeypatch.setattr("app.openclaw_live_pilot.subprocess.run", fake_run)
+
+    payload = _run_openclaw_turn(
+        session_id="pilot-user-thinking",
+        message="Ping",
+        timeout_seconds=150,
+        thinking_level="minimal",
+    )
+
+    assert "--thinking" in captured["args"]
+    thinking_index = captured["args"].index("--thinking")
+    assert captured["args"][thinking_index + 1] == "minimal"
+    assert payload["thinking_level"] == "minimal"
+    assert payload["timeout_seconds"] == 150
 
 
 def test_run_live_openclaw_pilot_aggregates_scenario_results(monkeypatch, tmp_path: Path) -> None:
@@ -119,7 +149,10 @@ def test_run_live_openclaw_pilot_aggregates_scenario_results(monkeypatch, tmp_pa
         for _ in range(5)
     ]
 
-    def fake_turn(**_kwargs):
+    turn_calls: list[dict[str, object]] = []
+
+    def fake_turn(**kwargs):
+        turn_calls.append(kwargs)
         return turns.pop(0)
 
     recalls = [
@@ -147,9 +180,21 @@ def test_run_live_openclaw_pilot_aggregates_scenario_results(monkeypatch, tmp_pa
         runtime_base_url="http://127.0.0.1:8080",
         user_id="pilot-user-2",
         artifact_run_name="pytest-live",
+        timeout_seconds=150,
+        continuity_timeout_seconds=240,
+        thinking_level="off",
+        continuity_thinking_level="minimal",
     )
 
     assert report["total"] == 5
     assert report["passed"] == 5
     assert report["failed"] == 0
     assert Path(report["artifact_dir"]).exists()
+    assert report["execution_profile"] == {
+        "timeout_seconds": 150,
+        "continuity_timeout_seconds": 240,
+        "thinking_level": "off",
+        "continuity_thinking_level": "minimal",
+    }
+    assert [call["timeout_seconds"] for call in turn_calls] == [150, 150, 150, 240, 150]
+    assert [call["thinking_level"] for call in turn_calls] == ["off", "off", "off", "minimal", "off"]

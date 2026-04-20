@@ -888,7 +888,8 @@ Definition of Done:
 - подтвержден реальный путь `OpenClaw -> runtime adapter -> ingestion -> consolidation -> recall`
 - отдельный live regression с утечкой raw `episode` в long-term adapter surface найден и исправлен
 - `noise resistance` теперь проходит на живом контуре после durable-only guardrails в adapter `list/search`
-- remaining live issue после последнего прогона относится к preview-truncation в evaluation criteria runner-а, а не к runtime storage semantics
+- отдельным следующим bottleneck после memory-side фиксов стал `OpenClaw embedded agent/provider timeout` на continuity-heavy прогонах
+- runner теперь поддерживает отдельный continuity execution profile: собственный timeout и явный `thinking` level для тяжелых live turns
 
 ### Negative Pilot Scenario Gate
 

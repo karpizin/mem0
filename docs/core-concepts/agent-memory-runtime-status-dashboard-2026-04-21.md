@@ -15,7 +15,7 @@ Current overall state: `MVP live-ready with important yellow zones`
 | `Forgetting / Lifecycle` | `yellow-green` | `7/10` | baseline decay/archive/eviction is in place; long-horizon behavior still needs more proof |
 | `Memory Hygiene / Junk Resistance` | `yellow-green` | `7/10` | provenance baseline, low-trust rejection, and low-value operational chatter demotion exist, but full anti-junk policy is still evolving |
 | `OpenClaw Integration` | `green` | `8/10` | runtime mode is live and real capture/recall flows work |
-| `OpenClaw Live Reliability` | `yellow` | `6/10` | the integration works, but heavy live scenarios still expose timeout bottlenecks |
+| `OpenClaw Live Reliability` | `yellow` | `6/10` | the integration works, but heavy live scenarios still expose timeout bottlenecks; a separate continuity execution profile now exists, but timeouts still reproduce under it |
 | `MCP Facade` | `green` | `7.5/10` | read-oriented MCP surface is implemented and usable |
 | `Local LLM Compatibility` | `yellow-green` | `7/10` | noisy JSON / Ollama hardening is already useful, but real-model coverage is still partial |
 | `Observability / Debuggability` | `green` | `8.5/10` | logs, traces, stats, pilot artifacts, and scorecards are strong |
@@ -62,6 +62,7 @@ Address `OpenClaw embedded agent/provider timeout`:
 - reduce prompt/build payload
 - raise agent timeout if appropriate
 - or choose a better live provider/model path for heavy continuity scenarios
+- latest rerun result: increasing live runner budget to `180/240s` with `thinking=off` did not remove the bottleneck, so the next move should prioritize payload slimming or provider/model changes over adding still more timeout
 
 ### `Promotion Decision Layer`
 

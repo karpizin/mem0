@@ -34,7 +34,7 @@ pilot-negative-scenarios:
 	bash scripts/openclaw_negative_pilot_scenarios.sh
 
 openclaw-live-pilot:
-	bash scripts/openclaw_live_pilot.sh
+	bash scripts/openclaw_live_pilot.sh $(ARGS)
 
 pilot-scorecard:
 	bash scripts/score_pilot_run.sh "$(INPUT)"

@@ -38,15 +38,16 @@
 - structured logs и observability дают достаточно сигналов для разбора live regressions
 - критичный blocker с утечкой raw `episode` в long-term adapter `list/search` закрыт
 
-Последний live pack дал результат `4/5`:
+Последний baseline live pack уже доходил до `5/5`, но после расширенного rerun surfaced более точный bottleneck:
 
-- `noise-resistance` теперь проходит на реальном контуре
-- remaining fail пришел не из runtime semantics, а из preview-truncation в live runner criteria для durable architecture memory
+- `memory-runtime` остается healthy и быстро обрабатывает jobs
+- часть continuity-heavy rerun'ов упирается уже в `OpenClaw embedded agent/provider timeout`
+- значит текущий live hardening сфокусирован не на storage semantics, а на execution profile самого live runner-а
 
 Практический вывод:
 
 - runtime уже готов к следующему содержательному live pilot
-- следующий шаг — не новый инфраструктурный hardening, а сценарный live прогон с фиксацией findings
+- следующий шаг — сценарный live прогон с фиксацией findings, но с более мягким continuity execution profile
 
 ## Состав пилота
 
@@ -110,6 +111,13 @@ curl http://localhost:8080/v1/observability/stats
 
 - `recallTimeoutMs = 15000`
 - дальше подстраивать уже по логам `openclaw-mem0: injecting ... (Xms/Yms budget)` и `openclaw-mem0: recall timed out ...`
+
+Для тяжелых continuity rerun'ов отдельно рекомендуются:
+
+- `timeout-seconds = 180`
+- `continuity-timeout-seconds = 240`
+- `thinking = off`
+- `continuity-thinking = off`
 
 Важно:
 
@@ -288,6 +296,10 @@ make openclaw-live-pilot
 - raw artifacts сохраняются в `.artifacts/pilot_traces/openclaw-live-pilot/<run-name>/`
 - runner теперь имеет отдельный process timeout guard, чтобы зависший `openclaw agent` не блокировал весь pilot бесконечно
 - long-term verification в live pack опирается на durable adapter surface и не считает raw `episode` из long-term `list/search` допустимым результатом
+- runner теперь поддерживает отдельный execution profile для continuity-heavy сценариев:
+  - обычные turn'ы используют `--timeout-seconds`
+  - cross-session continuity использует отдельный `--continuity-timeout-seconds`
+  - reasoning budget можно явно фиксировать через `--thinking` и `--continuity-thinking`
 
 Текущий live pack покрывает:
 
@@ -296,6 +308,13 @@ make openclaw-live-pilot
 - active session carryover
 - cross-session continuity
 - noise resistance
+
+Рекомендуемый continuity-heavy rerun:
+
+```bash
+cd /Users/slava/Documents/mem0-src/memory-runtime
+make openclaw-live-pilot ARGS="--timeout-seconds 180 --continuity-timeout-seconds 240 --thinking off --continuity-thinking off"
+```
 
 ### Negative pilot scenarios
 

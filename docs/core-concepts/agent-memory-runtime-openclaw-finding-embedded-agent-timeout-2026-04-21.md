@@ -33,6 +33,7 @@
   - inspect `/tmp/openclaw/openclaw-2026-04-21.log`
   - observe that continuity-heavy runs can hit the embedded agent/provider timeout even while memory-runtime remains healthy
 - `known scope:` `isolated`
+- `latest rerun note:` continuity-focused live runner with `--timeout-seconds 180 --continuity-timeout-seconds 240 --thinking off --continuity-thinking off` still reproduced the issue, with a visible `embedded run timeout ... timeoutMs=180000` on a heavy carryover turn
 
 ## Suspected Layer
 
@@ -42,7 +43,15 @@
 
 - `suspected cause:` the continuity scenario is now dominated by the OpenClaw agent/model execution path, including very large prompt payloads and upstream provider timeout behavior, so memory improvements alone do not close the end-to-end latency budget
 - `confidence:` `high`
-- `possible fix direction:` reduce prompt payload size, lower provider latency, or raise `agents.defaults.timeoutSeconds` before the next continuity-heavy live rerun
+- `possible fix direction:` reduce prompt payload size, lower provider latency, or raise `agents.defaults.timeoutSeconds` before the next continuity-heavy live rerun; as of the current hardening pass, the live runner also supports separate continuity timeout and explicit `thinking` controls so we can measure whether a lighter execution profile mitigates the issue before changing broader OpenClaw defaults
+
+## Follow-up After Reliability Rerun
+
+- `rerun date:` `2026-04-21`
+- `rerun outcome:` `partial mitigation only`
+- `what improved:` the live runner now makes timeout/thinking profiles explicit and reproducible, so future reruns are easier to compare apples-to-apples
+- `what did not improve:` the dominant bottleneck still reproduced under the lighter profile, and the timeout simply moved from `120000ms` to `180000ms`
+- `new evidence:` `/tmp/openclaw/openclaw-2026-04-21.log` shows `embedded run timeout ... timeoutMs=180000` and a surfaced timeout response on a heavy carryover turn, while `memory-runtime` remained healthy with no job failures or backlog growth
 
 ## Backlog Mapping
 

@@ -12,6 +12,12 @@ from app.http_client import create_local_runtime_client
 from app.pilot_artifacts import default_artifact_run_name, export_trace_bundle
 
 
+DEFAULT_TURN_TIMEOUT_SECONDS = 180
+DEFAULT_CONTINUITY_TIMEOUT_SECONDS = 240
+DEFAULT_THINKING_LEVEL = "off"
+DEFAULT_CONTINUITY_THINKING_LEVEL = "off"
+
+
 def load_openclaw_mem0_config(config_path: str | Path | None = None) -> dict[str, Any]:
     path = Path(config_path) if config_path is not None else (Path.home() / ".openclaw" / "openclaw.json")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -46,6 +52,7 @@ def _run_openclaw_turn(
     session_id: str,
     message: str,
     timeout_seconds: int,
+    thinking_level: str,
 ) -> dict[str, Any]:
     try:
         completed = subprocess.run(
@@ -58,6 +65,8 @@ def _run_openclaw_turn(
                 "--message",
                 message,
                 "--json",
+                "--thinking",
+                thinking_level,
                 "--timeout",
                 str(timeout_seconds),
             ],
@@ -96,6 +105,8 @@ def _run_openclaw_turn(
         "capture_confirmed": "auto-captured" in combined,
         "recall_timeout_observed": "recall timed out" in combined,
         "registered_count": combined.count("openclaw-mem0: registered"),
+        "timeout_seconds": timeout_seconds,
+        "thinking_level": thinking_level,
     }
 
 
@@ -227,7 +238,10 @@ def run_live_openclaw_pilot(
     artifact_run_name: str | None = None,
     poll_seconds: float = 0.5,
     max_wait_seconds: float = 15.0,
-    timeout_seconds: int = 120,
+    timeout_seconds: int = DEFAULT_TURN_TIMEOUT_SECONDS,
+    continuity_timeout_seconds: int = DEFAULT_CONTINUITY_TIMEOUT_SECONDS,
+    thinking_level: str = DEFAULT_THINKING_LEVEL,
+    continuity_thinking_level: str = DEFAULT_CONTINUITY_THINKING_LEVEL,
 ) -> dict[str, Any]:
     client = create_local_runtime_client(base_url=runtime_base_url, timeout=30.0)
     _wait_for_runtime_ready(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
@@ -237,6 +251,12 @@ def run_live_openclaw_pilot(
     shared_artifacts: dict[str, Any] = {
         "scope": scope,
         "initial_observability": client.get("/v1/observability/stats").json(),
+        "execution_profile": {
+            "timeout_seconds": timeout_seconds,
+            "continuity_timeout_seconds": continuity_timeout_seconds,
+            "thinking_level": thinking_level,
+            "continuity_thinking_level": continuity_thinking_level,
+        },
     }
 
     scenario_results: list[dict[str, Any]] = []
@@ -251,6 +271,7 @@ def run_live_openclaw_pilot(
             "with Postgres, Redis, and a dedicated worker. Please acknowledge briefly."
         ),
         timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
     )
     architecture_stats = _wait_for_jobs(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
     architecture_recall = _run_recall(
@@ -289,6 +310,7 @@ def run_live_openclaw_pilot(
             "before implementation details."
         ),
         timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
     )
     procedure_stats = _wait_for_jobs(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
     procedure_recall = _run_recall(
@@ -322,6 +344,7 @@ def run_live_openclaw_pilot(
         session_id=carry_session,
         message="Right now I am preparing the OpenClaw live pilot acceptance checklist.",
         timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
     )
     carry_stats = _wait_for_jobs(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
     carry_recall = _run_recall(
@@ -353,7 +376,8 @@ def run_live_openclaw_pilot(
     continuity_turn = _run_openclaw_turn(
         session_id=_safe_session_id(suffix, "continuity-source"),
         message="For future reference: we paused after validating live OpenClaw capture on pilot-user-2.",
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=continuity_timeout_seconds,
+        thinking_level=continuity_thinking_level,
     )
     continuity_stats = _wait_for_jobs(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
     continuity_recall = _run_recall(
@@ -386,6 +410,7 @@ def run_live_openclaw_pilot(
         session_id=_safe_session_id(suffix, "noise-source"),
         message="Temporary scratch note: maybe rename env vars next quarter.",
         timeout_seconds=timeout_seconds,
+        thinking_level=thinking_level,
     )
     noise_stats = _wait_for_jobs(client, poll_seconds=poll_seconds, max_wait_seconds=max_wait_seconds)
     noise_recall = _run_recall(
@@ -426,6 +451,7 @@ def run_live_openclaw_pilot(
         "agent_name": agent_name,
         "namespace_id": scope["namespace_id"],
         "agent_id": scope["agent_id"],
+        "execution_profile": shared_artifacts["execution_profile"],
         "total": len(scenario_results),
         "passed": passed,
         "failed": failed,
@@ -443,7 +469,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-run-name")
     parser.add_argument("--poll-seconds", type=float, default=0.5)
     parser.add_argument("--max-wait-seconds", type=float, default=15.0)
-    parser.add_argument("--timeout-seconds", type=int, default=120)
+    parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TURN_TIMEOUT_SECONDS)
+    parser.add_argument("--continuity-timeout-seconds", type=int, default=DEFAULT_CONTINUITY_TIMEOUT_SECONDS)
+    parser.add_argument("--thinking", default=DEFAULT_THINKING_LEVEL)
+    parser.add_argument("--continuity-thinking", default=DEFAULT_CONTINUITY_THINKING_LEVEL)
     args = parser.parse_args(argv)
 
     plugin_config = load_openclaw_mem0_config(args.config_path)
@@ -457,6 +486,9 @@ def main(argv: list[str] | None = None) -> int:
         poll_seconds=args.poll_seconds,
         max_wait_seconds=args.max_wait_seconds,
         timeout_seconds=args.timeout_seconds,
+        continuity_timeout_seconds=args.continuity_timeout_seconds,
+        thinking_level=args.thinking,
+        continuity_thinking_level=args.continuity_thinking,
     )
     print(json.dumps(report, ensure_ascii=False))
     return 0 if report["failed"] == 0 else 1
