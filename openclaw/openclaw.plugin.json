@@ -33,7 +33,7 @@
   "uiHints": {
     "mode": {
       "label": "Mode",
-      "help": "\"platform\" for Mem0 cloud, \"open-source\" for self-hosted"
+      "help": "\"platform\" for Mem0 cloud, \"open-source\" for self-hosted, \"runtime\" for standalone memory-runtime"
     },
     "apiKey": {
       "label": "Mem0 API Key",
@@ -84,6 +84,11 @@
       "advanced": true,
       "help": "Optional. Configure custom embedder, vector store, LLM, or history DB for open-source mode. For API keys in sub-provider configs, use SecretRef objects or ${VAR} syntax instead of plaintext values."
     },
+    "runtime": {
+      "label": "Runtime Configuration",
+      "advanced": true,
+      "help": "Runtime mode only. Configure the standalone memory-runtime service endpoint and bootstrap agent settings."
+    },
     "skills": {
       "label": "Agentic Memory Skills",
       "advanced": true,
@@ -98,7 +103,8 @@
         "type": "string",
         "enum": [
           "platform",
-          "open-source"
+          "open-source",
+          "runtime"
         ]
       },
       "apiKey": {
@@ -178,6 +184,24 @@
             "type": "string"
           }
         }
+      },
+      "runtime": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "agentName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseUrl"
+        ]
       },
       "skills": {
         "type": "object",
