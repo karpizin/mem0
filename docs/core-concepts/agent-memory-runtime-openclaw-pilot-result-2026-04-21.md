@@ -9,6 +9,7 @@
 - `environment:` `local live contour, OpenClaw on host + memory-runtime in Docker`
 - `namespace mode:` `isolated`
 - `notes:` `Run name: post-docs-rerun. Live pack executed through openclaw agent --local against pilot-user-2.`
+- `post-fix validation notes:` `A later rerun with recallTimeoutMs=15000 and low-value recall skip policy produced useful extra evidence but did not complete the whole pack because a continuity-heavy run hit OpenClaw embedded agent/provider timeout.`
 
 ## Scenario Summary
 
@@ -44,16 +45,18 @@
 - `queue/backlog issues:` none observed
 - `adapter contract issues:` long-term adapter surface behaved correctly after durable-only guardrail fix
 - `debuggability notes:` trace bundles and structured logs were sufficient to explain scenario selection
+- `post-fix validation notes:` memory-runtime stayed healthy during rerun attempts; the next dominant live bottleneck became the OpenClaw embedded agent/provider timeout path
 
 ## Findings Created
 
 - `finding-1:` [agent-memory-runtime-openclaw-finding-recall-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-finding-recall-timeout-2026-04-21.md)
+- `finding-2:` [agent-memory-runtime-openclaw-finding-embedded-agent-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-finding-embedded-agent-timeout-2026-04-21.md)
 
 ## Final Assessment
 
 - `pilot outcome:` `conditional-go`
-- `main blockers before next pilot:` inline plugin recall still logs `recall timed out after 8000ms`, which can reduce user-facing benefit even though the runtime itself is healthy
+- `main blockers before next pilot:` inline plugin recall still needs further trimming on continuity-heavy turns, and the latest rerun exposed OpenClaw embedded agent/provider timeout as a separate p1 blocker for long live scenarios
 - `recommended next actions:`
-  - make plugin recall timeout configurable or more tolerant for live contexts
-  - measure end-to-end recall latency inside the plugin path
-  - tighten prompt/build payload size or reduce cold-start broadening when it does not materially help
+  - continue trimming the legacy recall path for continuity-heavy live turns
+  - reduce prompt/build payload size or raise OpenClaw agent timeout for the continuity scenario
+  - rerun the same live pack after separating memory latency improvements from upstream model/provider timeout effects
