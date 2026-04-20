@@ -131,6 +131,17 @@ This should return one of:
 - `session_only`
 - `reject`
 
+Current implementation status:
+
+- implemented as an explicit internal decision layer in consolidation
+- provenance, low-trust, and transientness are now evaluated in one place
+- long-term candidates can now be:
+  - promoted
+  - demoted to `session_only`
+  - rejected
+- `session-space` / inferred short-term candidates continue to materialize as short-term memory units
+  so existing short-term lifecycle behavior is preserved
+
 ### Step 3: Rescue Loop
 
 Add signals that allow useful `session_only` content to be promoted later, for example:

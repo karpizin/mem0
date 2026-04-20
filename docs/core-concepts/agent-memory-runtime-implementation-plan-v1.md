@@ -1169,10 +1169,16 @@ Definition of Done:
 - `event_origin` добавлен как first-class сигнал в ingestion model
 - первый baseline-firewall демотирует risky origins в `session_only`
 - обычные `user_input` и `agent_output` события продолжают идти по стандартному durable pipeline
+- explicit promotion decision layer now combines:
+  - provenance
+  - low-trust signals
+  - transientness
+  - inferred memory scope
+- project/shared transient notes now demote to `session_only` instead of polluting long-term memory
+- low-trust poisoning patterns now flow through the same explicit decision layer instead of a separate implicit branch
 
 Следующий rollout:
 
-- ввести полноценный `promote / session_only / reject` decision layer
 - добавить rescue loop для полезного `session_only` контента
 - добавить false-negative eval suite для защиты полезной памяти от over-filtering
 

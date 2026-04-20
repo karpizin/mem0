@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -86,6 +87,31 @@ SESSION_ONLY_ORIGINS = {
     "heartbeat": "heartbeat_not_durable",
     "cron": "cron_not_durable",
 }
+TRANSIENT_PATTERNS = {
+    "temporary_scratch_not_durable": (
+        "temporary scratch",
+        "scratch note",
+        "scratch experiment",
+        "temporary note",
+        "deprecated prototype",
+    ),
+    "tentative_plan_not_durable": (
+        "for now",
+        "maybe rename",
+        "rename later",
+        "next quarter",
+        "later today",
+        "current session only",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class PromotionDecision:
+    decision: str
+    effective_scope: str
+    reason: str | None
+    signals: dict[str, str | bool]
 
 
 class ConsolidationService:
@@ -107,11 +133,15 @@ class ConsolidationService:
             event_type=event_type,
             content=content,
         )
-        promotion_decision, promotion_reason = self.promotion_decision_baseline(
+        promotion = self.evaluate_promotion_decision(
             event_origin=event_origin,
             inferred_scope=scope,
+            content=content,
+            kind=kind,
+            event_type=event_type,
+            space_type=space_type,
         )
-        if promotion_decision == "session_only":
+        if promotion.decision == "session_only":
             self.audit.create(
                 namespace_id=episode.namespace_id,
                 agent_id=episode.agent_id,
@@ -122,14 +152,15 @@ class ConsolidationService:
                     "space_type": space_type,
                     "event_type": event_type,
                     "event_origin": event_origin,
-                    "reason": promotion_reason,
-                    "classification": "origin_firewall",
+                    "reason": promotion.reason,
+                    "effective_scope": promotion.effective_scope,
+                    "signals": promotion.signals,
+                    "classification": "promotion_decision",
                 },
             )
             self.session.flush()
             return "ignored", episode.id
-        low_trust_reason = self.detect_low_trust_reason(content) if scope == "long-term" else None
-        if low_trust_reason is not None:
+        if promotion.decision == "reject":
             self.audit.create(
                 namespace_id=episode.namespace_id,
                 agent_id=episode.agent_id,
@@ -139,12 +170,16 @@ class ConsolidationService:
                 details_json={
                     "space_type": space_type,
                     "event_type": event_type,
-                    "reason": low_trust_reason,
-                    "classification": "low_trust",
+                    "event_origin": event_origin,
+                    "reason": promotion.reason,
+                    "effective_scope": promotion.effective_scope,
+                    "signals": promotion.signals,
+                    "classification": "promotion_decision",
                 },
             )
             self.session.flush()
             return "ignored", episode.id
+        scope = promotion.effective_scope
         merge_key = self.normalize_merge_key(content)
 
         existing = None
@@ -273,14 +308,98 @@ class ConsolidationService:
             return "fact", "long-term"
         return "episodic_summary", "short-term"
 
-    @staticmethod
-    def promotion_decision_baseline(*, event_origin: str, inferred_scope: str) -> tuple[str, str | None]:
+    @classmethod
+    def evaluate_promotion_decision(
+        cls,
+        *,
+        event_origin: str,
+        inferred_scope: str,
+        content: str,
+        kind: str,
+        event_type: str,
+        space_type: str,
+    ) -> PromotionDecision:
+        low_trust_reason = cls.detect_low_trust_reason(content) if inferred_scope == "long-term" else None
+        transient_reason = (
+            cls.detect_transient_reason(
+                content=content,
+                kind=kind,
+                event_type=event_type,
+                space_type=space_type,
+            )
+            if inferred_scope == "long-term"
+            else None
+        )
+        signals = {
+            "event_origin": event_origin,
+            "inferred_scope": inferred_scope,
+            "kind": kind,
+            "event_type": event_type,
+            "space_type": space_type,
+            "low_trust": low_trust_reason is not None,
+            "transient": transient_reason is not None,
+            "origin_demoted": event_origin in SESSION_ONLY_ORIGINS,
+        }
+
+        if low_trust_reason is not None:
+            return PromotionDecision(
+                decision="reject",
+                effective_scope="none",
+                reason=low_trust_reason,
+                signals=signals,
+            )
+
         if inferred_scope != "long-term":
-            return "promote", None
-        reason = SESSION_ONLY_ORIGINS.get(event_origin)
-        if reason is not None:
-            return "session_only", reason
-        return "promote", None
+            return PromotionDecision(
+                decision="promote",
+                effective_scope=inferred_scope,
+                reason="short_term_scope",
+                signals=signals,
+            )
+
+        origin_reason = SESSION_ONLY_ORIGINS.get(event_origin)
+        if origin_reason is not None:
+            return PromotionDecision(
+                decision="session_only",
+                effective_scope="short-term",
+                reason=origin_reason,
+                signals=signals,
+            )
+
+        if transient_reason is not None:
+            return PromotionDecision(
+                decision="session_only",
+                effective_scope="short-term",
+                reason=transient_reason,
+                signals=signals,
+            )
+
+        return PromotionDecision(
+            decision="promote",
+            effective_scope=inferred_scope,
+            reason=None,
+            signals=signals,
+        )
+
+    @classmethod
+    def detect_transient_reason(
+        cls,
+        *,
+        content: str,
+        kind: str,
+        event_type: str,
+        space_type: str,
+    ) -> str | None:
+        if space_type not in {"project-space", "shared-space"}:
+            return None
+        if kind in {"decision", "procedure"} or event_type in {"architecture_decision", "decision", "policy_update"}:
+            return None
+
+        normalized = cls._normalize_text(content)
+        for reason, phrases in TRANSIENT_PATTERNS.items():
+            if any(phrase in normalized for phrase in phrases):
+                return reason
+        return None
 
     @staticmethod
     def build_memory_content(summary: str) -> str:
