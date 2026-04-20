@@ -110,7 +110,7 @@ Validation completed:
 
 ### Layer 3: MCP Facade
 
-Status: next
+Status: completed on `codex/upstream-sync-integration`
 
 Transfer third:
 
@@ -126,6 +126,12 @@ Why third:
 - lower merge risk than direct `openclaw/` changes
 
 Expected conflict level: low to medium
+
+Validation completed:
+
+- `memory-runtime`: `108 passed`
+- `memory-runtime`: `pytest tests/component/test_mcp_api.py -q`
+- `memory-runtime`: `ruff check .`
 
 ### Layer 4: Local LLM Hardening
 
