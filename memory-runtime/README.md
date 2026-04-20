@@ -1,0 +1,252 @@
+# Memory Runtime
+
+`memory-runtime` — отдельный сервисный контур для `Agent Memory Runtime`, который строится поверх `mem0-core`.
+
+На текущем этапе это scaffold первой версии сервиса:
+
+- FastAPI приложение
+- конфигурация через environment variables
+- health endpoint
+- namespace, event, recall, and adapter APIs
+- Dockerfile
+- Docker Compose для локального старта
+- минимальная test harness
+- `Makefile` с базовыми dev и quality командами
+
+## Структура
+
+```text
+memory-runtime/
+  app/
+  tests/
+  .env.example
+  Makefile
+  Dockerfile
+  docker-compose.yml
+  pyproject.toml
+```
+
+## Конфигурация
+
+Скопируй шаблон переменных окружения:
+
+```bash
+cd memory-runtime
+cp .env.example .env
+```
+
+Основные переменные:
+
+- `MEMORY_RUNTIME_APP_NAME`
+- `MEMORY_RUNTIME_ENV`
+- `MEMORY_RUNTIME_DEBUG`
+- `MEMORY_RUNTIME_API_PORT`
+- `MEMORY_RUNTIME_WORKER_POLL_SECONDS`
+- `MEMORY_RUNTIME_POSTGRES_DSN`
+- `MEMORY_RUNTIME_REDIS_URL`
+- `MEMORY_RUNTIME_MEM0_BRIDGE_ENABLED`
+- `MEMORY_RUNTIME_MEM0_BASE_URL`
+- `MEMORY_RUNTIME_MEM0_API_KEY`
+
+По умолчанию локальный scaffold использует SQLite-файл для безопасного старта без внешней БД.
+Для Docker и реального runtime используется явный Postgres DSN из `.env`.
+`mem0 bridge` по умолчанию выключен и включается только явной конфигурацией.
+
+## Установка dev-зависимостей
+
+```bash
+cd memory-runtime
+python3 -m pip install -e '.[dev]'
+```
+
+## Локальный запуск
+
+```bash
+cd memory-runtime
+make run
+make run-worker
+```
+
+## Docker Compose
+
+```bash
+cd memory-runtime
+cp .env.example .env
+docker compose up --build
+```
+
+Сервис будет доступен на:
+
+- `http://localhost:8080`
+- `http://localhost:8080/healthz`
+- `http://localhost:8080/docs`
+
+Compose baseline теперь поднимает:
+
+- `memory-api`
+- `memory-worker`
+- `postgres`
+- `redis`
+
+Readiness baseline теперь включает:
+
+- healthcheck для `postgres`
+- healthcheck для `redis`
+- heartbeat-based healthcheck для `memory-worker`
+- `service_healthy` dependencies для API и worker
+
+Для первого живого MVP-пилота с `OpenClaw` смотри runbook:
+- [agent-memory-runtime-openclaw-pilot-runbook.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-pilot-runbook.md)
+- Для практического использования MCP смотри [agent-memory-runtime-mcp-guide.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-mcp-guide.md)
+
+## API surface
+
+Уже реализованы:
+
+- `GET /metrics`
+- `POST /mcp/{client_name}/http/{user_id}`
+- `POST /v1/namespaces`
+- `GET /v1/namespaces/{namespace_id}`
+- `POST /v1/namespaces/{namespace_id}/agents`
+- `POST /v1/events`
+- `POST /v1/recall`
+- `POST /v1/recall/feedback`
+- `GET /v1/observability/stats`
+- `POST /v1/adapters/openclaw/bootstrap`
+- `POST /v1/adapters/openclaw/events`
+- `POST /v1/adapters/openclaw/recall`
+- `POST /v1/adapters/openclaw/search`
+- `GET /v1/adapters/openclaw/memories`
+- `GET /v1/adapters/openclaw/memories/{memory_id}`
+- `DELETE /v1/adapters/openclaw/memories/{memory_id}`
+- `POST /v1/adapters/bunkerai/events`
+- `POST /v1/adapters/bunkerai/recall`
+
+Адаптерные endpoints фиксируют source-system contract для интеграций и работают поверх того же ingestion/recall pipeline.
+Для `OpenClaw` добавлен отдельный runtime-contract: плагин сначала вызывает `bootstrap`, затем использует `events/search/list/get/delete` как transport-поверхность вместо прямого подключения к `mem0`.
+Long-term `search/list` в adapter contract теперь возвращают только long-term candidates и не подтягивают `session-space`; уже консолидированные эпизоды не дублируются рядом с `memory_units`.
+Consolidation baseline теперь умеет:
+- повышать decision-like `conversation_turn` до `decision`
+- повышать procedural guidance до `procedure`
+- canonicalize phrasing variants для более устойчивого merge
+- supersede явные противоречащие long-term memories в пределах одного пространства вместо наивного сосуществования конфликтующих фактов
+ - отклонять low-trust prompt-like и memory-poisoning candidates до их попадания в long-term memory
+В shared namespace `shared-space` доступен межагентно, при этом `agent-core` остается приватным.
+`/metrics` отдает Prometheus-compatible экспорт counters и job gauges, а `/v1/observability/stats` дает JSON-срез для локальной диагностики и dashboard bootstrap.
+Worker-derived operational counters (`jobs_*`, `consolidation_*`, `lifecycle_*`) теперь считаются из shared DB state (`jobs` и `audit_log`), а не только из process-local памяти.
+`/v1/observability/stats` также показывает `oldest_pending_age_seconds` и `stalled_running_count`, чтобы было проще увидеть backlog или зависшие worker jobs.
+`/v1/recall/feedback` записывает usefulness signals, которые потом участвуют в последующем ranking.
+При включенном `mem0 bridge` runtime может синхронизировать long-term memories в `mem0` и использовать его как внешний recall source.
+`POST /mcp/{client_name}/http/{user_id}` реализует stateless MCP Streamable HTTP facade поверх тех же runtime services.
+Текущий MCP surface включает:
+- `initialize`
+- `tools/list`
+- `tools/call` для `memory.recall`, `memory.search`, `memory.list_spaces`, `memory.get_observability_snapshot`, `memory.get_memory_unit`
+- `resources/templates/list`
+- `resources/read`
+- `prompts/list`
+- `prompts/get`
+Для ресурса `latest agent brief` runtime сохраняет `recall_executed` entries в `audit_log`, чтобы MCP-клиенты могли читать последний recall без отдельного кеша.
+MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_resource_reads_total`, `mcp_prompt_requests_total`, `mcp_errors_total`) экспортируются через `/metrics`.
+
+## Тесты
+
+Базовые scaffold-тесты покрывают:
+
+- конфигурацию по умолчанию и через environment variables
+- health endpoint
+- namespace and agent API baseline
+- event ingestion and episode creation baseline
+- recall baseline and `MemoryBrief` structure
+- consolidation jobs, worker processing, and `memory_units` baseline
+- consolidation regressions for semantic merge, kind inference, and contradictory memory supersede
+- low-trust consolidation rejection for prompt-like long-term poisoning attempts
+- lifecycle jobs, decay/archive/eviction baseline, and internal metrics counters
+- adapter contracts for `OpenClaw` and `BunkerAI`
+- OpenClaw runtime adapter coverage for bootstrap, search, list, get, and delete
+- shared namespace e2e scenario for cross-agent memory exchange
+- OpenClaw pilot e2e continuity flow
+- Prometheus-style metrics exporter and observability stats endpoint
+- recall feedback loop and usefulness-aware reranking
+- mem0 bridge unit coverage without external network dependency
+- idempotent ingestion for duplicate events on the same dedupe key
+- recall trace explainability with decisive selection signals
+- golden compactness regression for low-budget memory briefs
+- MCP Streamable HTTP facade with tools/resources/prompts contract and transport validation
+
+Команды запуска:
+
+```bash
+cd memory-runtime
+make test-unittest
+make test
+make test-e2e
+make preflight
+make pilot-smoke
+make pilot-scenarios
+make pilot-negative-scenarios
+make pilot-scorecard INPUT=/path/to/live_scorecard.json
+make quality-eval
+make lifecycle-eval
+make continuity-benchmark
+make compare-eval BEFORE=/path/to/before.json AFTER=/path/to/after.json
+make snapshot-pilot NAME=before-live
+make restore-pilot SNAPSHOT=before-live
+make show-pilot-snapshots
+make inspect-memories ARGS="--namespace-id <ns> --agent-id <agent> --limit 10"
+make inspect-memory-lifecycle ARGS="--namespace-id <ns> --agent-id <agent> --limit 10"
+make explain-recall ARGS="--namespace-id <ns> --agent-id <agent> --session-id live-debug --query 'What should be recalled?'"
+make show-last-smoke
+make show-last-quality-eval
+make reset-pilot
+```
+
+`make preflight` прогоняет единый runtime preflight check и сохраняет JSON report в `.artifacts/openclaw_preflight_report.json`.
+`make pilot-smoke` поднимает Docker stack, прогоняет synthetic OpenClaw pilot contour и сохраняет JSON report в `.artifacts/openclaw_pilot_smoke_report.json`.
+`make pilot-smoke` дополнительно сохраняет raw trace bundle в `.artifacts/pilot_traces/pilot-smoke/<run-name>/`.
+`make pilot-scenarios` прогоняет 5 наиболее важных OpenClaw pilot scenarios и сохраняет JSON report в `.artifacts/openclaw_pilot_scenarios_report.json`.
+`make pilot-scenarios` дополнительно сохраняет per-scenario trace bundle в `.artifacts/pilot_traces/pilot-scenarios/<run-name>/`.
+`make pilot-negative-scenarios` прогоняет 3 негативных pre-live сценария и сохраняет JSON report в `.artifacts/openclaw_negative_pilot_scenarios_report.json`.
+`make pilot-negative-scenarios` дополнительно сохраняет trace bundle в `.artifacts/pilot_traces/pilot-negative-scenarios/<run-name>/`.
+`make pilot-scorecard INPUT=...` считает live-pilot summary и verdict по заполненному JSON scorecard.
+`make quality-eval` прогоняет 10 golden recall scenarios, печатает JSON report и служит регрессионным барьером для retrieval tuning.
+В quality report теперь есть не только `pass/fail`, но и `required_hit_rate`, `forbidden_leak_rate`, `avg_selected_count` и `mean_scenario_score`.
+`make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
+`make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.
+`make compare-eval BEFORE=... AFTER=...` сравнивает два machine-readable eval report и показывает, где качество улучшилось, регрессировало или осталось без изменений.
+Adversarial eval suite теперь покрывает instruction override, prompt exfiltration, explicit memory poisoning, mixed malicious content и benign control cases.
+`make snapshot-pilot NAME=...` сохраняет SQL dump pilot-базы, observability snapshot и текущие pilot reports в `.artifacts/pilot_snapshots/<name>/`.
+`make restore-pilot SNAPSHOT=...` восстанавливает snapshot обратно в compose Postgres и возвращает связанные pilot reports в `.artifacts/`.
+`make show-pilot-snapshots` показывает доступные snapshots и их manifest metadata.
+`make inspect-memories ARGS="..."` печатает последние `memory_units` с key debugging полями прямо из БД.
+`make inspect-memory-lifecycle ARGS="..."` печатает archived/superseded memory units для разбора forgetting и contradiction flows.
+`make explain-recall ARGS="..."` запускает recall и печатает `selection_explanations` с `slot`, `decisive_signal` и `why`.
+`make show-last-smoke` и `make show-last-quality-eval` показывают последние сохраненные pilot reports.
+Trace bundles теперь включают raw recall payloads, observability snapshots и per-scenario manifests, чтобы live-debugging не зависел только от итогового summary report.
+`make reset-pilot` сбрасывает compose stack, pilot reports и локальный pilot state для чистого повторного прогона, но не удаляет сохраненные snapshots.
+
+Миграции:
+
+```bash
+cd memory-runtime
+make migrate
+```
+
+## Quality workflow
+
+Локальные проверки:
+
+```bash
+cd memory-runtime
+make lint
+make test
+```
+
+Fallback smoke suite без `pytest`:
+
+```bash
+cd memory-runtime
+make smoke
+```
+
+Текущие scaffold-тесты совместимы и с `unittest`, и с `pytest`.
