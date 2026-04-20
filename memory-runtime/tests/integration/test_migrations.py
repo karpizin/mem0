@@ -33,4 +33,6 @@ class MigrationTests(unittest.TestCase):
             self.assertTrue(
                 {"agents", "episodes", "memory_events", "memory_spaces", "namespaces"}.issubset(table_names)
             )
+            memory_event_columns = {column["name"] for column in inspector.get_columns("memory_events")}
+            self.assertIn("event_origin", memory_event_columns)
             self.assertIn("alembic_version", table_names)

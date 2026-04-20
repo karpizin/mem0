@@ -7,6 +7,17 @@ from pydantic import BaseModel, Field, field_validator
 
 ALLOWED_ROLES = {"system", "user", "assistant", "tool"}
 ALLOWED_SPACE_HINTS = {"session-space", "project-space", "agent-core", "shared-space"}
+ALLOWED_EVENT_ORIGINS = {
+    "user_input",
+    "agent_output",
+    "tool_output",
+    "recalled_memory",
+    "system_boot",
+    "heartbeat",
+    "cron",
+    "operator_template",
+    "external_import",
+}
 
 
 class EventMessage(BaseModel):
@@ -37,6 +48,7 @@ class EventCreate(BaseModel):
     project_id: str | None = None
     source_system: str = Field(..., min_length=2, max_length=100)
     event_type: str = Field(..., min_length=2, max_length=100)
+    event_origin: str | None = None
     timestamp: datetime | None = None
     space_hint: str | None = None
     messages: list[EventMessage] = Field(..., min_length=1)
@@ -53,6 +65,16 @@ class EventCreate(BaseModel):
             raise ValueError(f"Unsupported space_hint '{value}'")
         return normalized
 
+    @field_validator("event_origin")
+    @classmethod
+    def validate_event_origin(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if normalized not in ALLOWED_EVENT_ORIGINS:
+            raise ValueError(f"Unsupported event_origin '{value}'")
+        return normalized
+
 
 class EventRead(BaseModel):
     id: str
@@ -64,6 +86,7 @@ class EventRead(BaseModel):
     project_id: str | None
     source_system: str
     event_type: str
+    event_origin: str
     dedupe_key: str | None
     event_ts: datetime
     ingested_at: datetime

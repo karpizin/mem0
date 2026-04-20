@@ -93,6 +93,7 @@ class RepositoryTests(unittest.TestCase):
             project_id="mem-runtime",
             source_system="openclaw",
             event_type="conversation_turn",
+            event_origin="user_input",
             payload_json={"messages": [{"role": "user", "content": "Continue the plan"}], "metadata": {}},
             event_ts=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
             dedupe_key="dedupe-1",

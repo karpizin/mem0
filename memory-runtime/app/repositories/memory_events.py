@@ -23,6 +23,7 @@ class MemoryEventRepository:
         project_id: str | None,
         source_system: str,
         event_type: str,
+        event_origin: str,
         payload_json: dict[str, Any],
         event_ts: datetime,
         dedupe_key: str | None,
@@ -35,6 +36,7 @@ class MemoryEventRepository:
             project_id=project_id,
             source_system=source_system,
             event_type=event_type,
+            event_origin=event_origin,
             payload_json=payload_json,
             event_ts=event_ts,
             dedupe_key=dedupe_key,
@@ -60,3 +62,6 @@ class MemoryEventRepository:
         else:
             stmt = stmt.where(MemoryEvent.agent_id == agent_id)
         return self.session.execute(stmt).scalar_one_or_none()
+
+    def get_by_id(self, event_id: str) -> MemoryEvent | None:
+        return self.session.get(MemoryEvent, event_id)

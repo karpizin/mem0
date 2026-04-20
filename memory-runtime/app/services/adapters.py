@@ -111,6 +111,7 @@ class AdapterService:
                 project_id=payload.project_id,
                 source_system=adapter_name,
                 event_type=payload.event_type,
+                event_origin=payload.event_origin,
                 timestamp=payload.timestamp,
                 space_hint=payload.space_hint,
                 messages=payload.messages,

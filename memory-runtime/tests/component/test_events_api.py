@@ -73,6 +73,7 @@ class EventsApiTests(unittest.TestCase):
         self.assertIsNotNone(payload["episode_id"])
         self.assertEqual(payload["session_id"], "run_123")
         self.assertEqual(payload["project_id"], "mem-runtime")
+        self.assertEqual(payload["event_origin"], "user_input")
         self.assertEqual(
             payload["payload_json"]["messages"],
             [
@@ -111,6 +112,26 @@ class EventsApiTests(unittest.TestCase):
         self.assertEqual(first_payload["id"], second_payload["id"])
         self.assertEqual(first_payload["episode_id"], second_payload["episode_id"])
         self.assertEqual(first_payload["dedupe_key"], second_payload["dedupe_key"])
+
+    def test_event_ingestion_persists_explicit_event_origin(self) -> None:
+        response = self.client.post(
+            "/v1/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_recall",
+                "source_system": "openclaw",
+                "event_type": "conversation_turn",
+                "event_origin": "recalled_memory",
+                "messages": [
+                    {"role": "assistant", "content": "Use the previously recalled architecture brief."},
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["event_origin"], "recalled_memory")
 
         with get_engine().connect() as connection:
             events_count = connection.execute(text("SELECT COUNT(*) FROM memory_events")).scalar_one()

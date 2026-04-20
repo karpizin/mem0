@@ -25,6 +25,7 @@ class MemoryEvent(Base):
     project_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_system: Mapped[str] = mapped_column(String(100))
     event_type: Mapped[str] = mapped_column(String(100))
+    event_origin: Mapped[str] = mapped_column(String(50), default="user_input")
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     event_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

@@ -96,3 +96,25 @@ class ConsolidationServiceContractTests(unittest.TestCase):
         )
 
         self.assertIsNone(reason)
+
+    def test_promotion_decision_baseline_demotes_recalled_memory_for_long_term(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision, reason = ConsolidationService.promotion_decision_baseline(
+            event_origin="recalled_memory",
+            inferred_scope="long-term",
+        )
+
+        self.assertEqual(decision, "session_only")
+        self.assertEqual(reason, "recalled_memory_not_durable")
+
+    def test_promotion_decision_baseline_keeps_user_input_promotable(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision, reason = ConsolidationService.promotion_decision_baseline(
+            event_origin="user_input",
+            inferred_scope="long-term",
+        )
+
+        self.assertEqual(decision, "promote")
+        self.assertIsNone(reason)

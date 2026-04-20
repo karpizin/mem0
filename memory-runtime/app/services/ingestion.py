@@ -41,6 +41,11 @@ class IngestionService:
                 raise LookupError(f"Agent '{payload.agent_id}' not found in namespace")
 
         normalized_messages = self.normalize_messages(payload.messages)
+        event_origin = self.infer_event_origin(
+            explicit_origin=payload.event_origin,
+            event_type=payload.event_type,
+            messages=normalized_messages,
+        )
         event_ts = payload.timestamp or _utcnow()
         project_id = payload.project_id or self._metadata_project_id(payload.metadata)
         space = self.resolve_target_space(
@@ -60,6 +65,7 @@ class IngestionService:
             session_id=payload.session_id,
             source_system=payload.source_system,
             event_type=payload.event_type,
+            event_origin=event_origin,
             normalized_payload=normalized_payload,
         )
 
@@ -82,6 +88,7 @@ class IngestionService:
             project_id=project_id,
             source_system=payload.source_system.strip().lower(),
             event_type=payload.event_type.strip().lower(),
+            event_origin=event_origin,
             payload_json=normalized_payload,
             event_ts=event_ts,
             dedupe_key=dedupe_key,
@@ -148,6 +155,31 @@ class IngestionService:
         return "normal"
 
     @staticmethod
+    def infer_event_origin(
+        *,
+        explicit_origin: str | None,
+        event_type: str,
+        messages: list[EventMessage],
+    ) -> str:
+        if explicit_origin is not None:
+            return explicit_origin
+
+        normalized_event_type = event_type.strip().lower()
+        if normalized_event_type == "heartbeat":
+            return "heartbeat"
+        if normalized_event_type == "cron":
+            return "cron"
+
+        roles = {message.role for message in messages}
+        if roles == {"system"}:
+            return "system_boot"
+        if roles == {"tool"}:
+            return "tool_output"
+        if roles == {"assistant"}:
+            return "agent_output"
+        return "user_input"
+
+    @staticmethod
     def compute_dedupe_key(
         *,
         namespace_id: str,
@@ -155,6 +187,7 @@ class IngestionService:
         session_id: str | None,
         source_system: str,
         event_type: str,
+        event_origin: str,
         normalized_payload: dict,
     ) -> str:
         raw = json.dumps(
@@ -164,6 +197,7 @@ class IngestionService:
                 "session_id": session_id,
                 "source_system": source_system.strip().lower(),
                 "event_type": event_type.strip().lower(),
+                "event_origin": event_origin,
                 "payload": normalized_payload,
             },
             sort_keys=True,
@@ -188,6 +222,7 @@ class IngestionService:
             project_id=event.project_id,
             source_system=event.source_system,
             event_type=event.event_type,
+            event_origin=event.event_origin,
             dedupe_key=event.dedupe_key,
             event_ts=event.event_ts,
             ingested_at=event.ingested_at,

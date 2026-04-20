@@ -35,6 +35,7 @@ class IngestionServiceTests(unittest.TestCase):
             session_id="run-1",
             source_system="openclaw",
             event_type="conversation_turn",
+            event_origin="user_input",
             normalized_payload=payload,
         )
         second = IngestionService.compute_dedupe_key(
@@ -43,7 +44,38 @@ class IngestionServiceTests(unittest.TestCase):
             session_id="run-1",
             source_system="openclaw",
             event_type="conversation_turn",
+            event_origin="user_input",
             normalized_payload=payload,
         )
 
         self.assertEqual(first, second)
+
+    def test_infer_event_origin_prefers_explicit_origin(self) -> None:
+        origin = IngestionService.infer_event_origin(
+            explicit_origin="recalled_memory",
+            event_type="conversation_turn",
+            messages=[EventMessage(role="assistant", content="Use the previous brief")],
+        )
+
+        self.assertEqual(origin, "recalled_memory")
+
+    def test_infer_event_origin_detects_system_boot(self) -> None:
+        origin = IngestionService.infer_event_origin(
+            explicit_origin=None,
+            event_type="conversation_turn",
+            messages=[EventMessage(role="system", content="Bootstrap instructions")],
+        )
+
+        self.assertEqual(origin, "system_boot")
+
+    def test_infer_event_origin_defaults_to_user_input_for_mixed_turn(self) -> None:
+        origin = IngestionService.infer_event_origin(
+            explicit_origin=None,
+            event_type="conversation_turn",
+            messages=[
+                EventMessage(role="user", content="Continue the migration"),
+                EventMessage(role="assistant", content="I updated the plan"),
+            ],
+        )
+
+        self.assertEqual(origin, "user_input")

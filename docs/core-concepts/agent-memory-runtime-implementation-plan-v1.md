@@ -1142,6 +1142,40 @@ Definition of Done:
 
 - `agent-memory-runtime-mcp-spec-v1.md`
 
+### Phase P. Promotion Firewall And Provenance
+
+Результат:
+
+- memory-runtime получает first-class provenance signal для каждого события
+- durable promotion перестает быть слепой к происхождению контента
+- feedback-loop и bootstrap/system contamination начинают блокироваться на входе в long-term layer
+
+Definition of Done:
+
+- у `memory_events` есть `event_origin`
+- ingestion и adapters умеют принимать explicit origin и безопасно infer origin по умолчанию
+- consolidation учитывает origin при решении о durable promotion
+- `recalled_memory`, `system_boot`, `heartbeat`, `cron` не промотятся в long-term по умолчанию
+- blocked promotion фиксируется в `audit_log`
+- есть regression tests на origin inference и session-only demotion
+
+Статус:
+
+- `in_progress`
+
+Подтверждение текущего объема:
+
+- добавлен design artifact `agent-memory-runtime-promotion-firewall-design.md`
+- `event_origin` добавлен как first-class сигнал в ingestion model
+- первый baseline-firewall демотирует risky origins в `session_only`
+- обычные `user_input` и `agent_output` события продолжают идти по стандартному durable pipeline
+
+Следующий rollout:
+
+- ввести полноценный `promote / session_only / reject` decision layer
+- добавить rescue loop для полезного `session_only` контента
+- добавить false-negative eval suite для защиты полезной памяти от over-filtering
+
 ## 6. Первые технические backlog items
 
 ### Iteration 1

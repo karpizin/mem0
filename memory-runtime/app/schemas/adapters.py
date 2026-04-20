@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.schemas.event import ALLOWED_SPACE_HINTS, EventMessage, EventRead
+from app.schemas.event import ALLOWED_EVENT_ORIGINS, ALLOWED_SPACE_HINTS, EventMessage, EventRead
 from app.schemas.recall import MemoryBrief, RecallTrace
 
 
@@ -14,6 +14,7 @@ class AdapterEventCreate(BaseModel):
     session_id: str | None = None
     project_id: str | None = None
     event_type: str = Field(..., min_length=2, max_length=100)
+    event_origin: str | None = None
     timestamp: datetime | None = None
     space_hint: str | None = None
     messages: list[EventMessage] = Field(..., min_length=1)
@@ -28,6 +29,16 @@ class AdapterEventCreate(BaseModel):
         normalized = value.strip().lower()
         if normalized not in ALLOWED_SPACE_HINTS:
             raise ValueError(f"Unsupported space_hint '{value}'")
+        return normalized
+
+    @field_validator("event_origin")
+    @classmethod
+    def validate_event_origin(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if normalized not in ALLOWED_EVENT_ORIGINS:
+            raise ValueError(f"Unsupported event_origin '{value}'")
         return normalized
 
 

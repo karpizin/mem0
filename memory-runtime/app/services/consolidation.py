@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.models.episode import Episode
 from app.repositories.audit_logs import AuditLogRepository
-from app.repositories.memory_spaces import MemorySpaceRepository
 from app.repositories.jobs import JobRepository
+from app.repositories.memory_events import MemoryEventRepository
 from app.repositories.memory_units import MemoryUnitRepository
 from app.services.mem0_bridge import build_mem0_bridge
 from app.telemetry.metrics import increment_metric
@@ -80,25 +80,54 @@ LOW_TRUST_PATTERNS = {
         "add this to long term memory",
     ),
 }
+SESSION_ONLY_ORIGINS = {
+    "recalled_memory": "recalled_memory_not_durable",
+    "system_boot": "system_boot_not_durable",
+    "heartbeat": "heartbeat_not_durable",
+    "cron": "cron_not_durable",
+}
 
 
 class ConsolidationService:
     def __init__(self, session: Session):
         self.session = session
         self.memory_units = MemoryUnitRepository(session)
-        self.spaces = MemorySpaceRepository(session)
+        self.events = MemoryEventRepository(session)
         self.audit = AuditLogRepository(session)
         self.jobs = JobRepository(session)
         self.mem0_bridge = build_mem0_bridge()
 
     def consolidate_episode(self, episode: Episode, space_type: str) -> tuple[str, str]:
         event_type = self._extract_event_type(episode.summary)
+        event = self.events.get_by_id(episode.start_event_id)
+        event_origin = event.event_origin if event is not None else "user_input"
         content = self.build_memory_content(episode.summary)
         kind, scope = self.infer_memory_attributes(
             space_type=space_type,
             event_type=event_type,
             content=content,
         )
+        promotion_decision, promotion_reason = self.promotion_decision_baseline(
+            event_origin=event_origin,
+            inferred_scope=scope,
+        )
+        if promotion_decision == "session_only":
+            self.audit.create(
+                namespace_id=episode.namespace_id,
+                agent_id=episode.agent_id,
+                entity_type="episode",
+                entity_id=episode.id,
+                action="memory_candidate_demoted_session_only",
+                details_json={
+                    "space_type": space_type,
+                    "event_type": event_type,
+                    "event_origin": event_origin,
+                    "reason": promotion_reason,
+                    "classification": "origin_firewall",
+                },
+            )
+            self.session.flush()
+            return "ignored", episode.id
         low_trust_reason = self.detect_low_trust_reason(content) if scope == "long-term" else None
         if low_trust_reason is not None:
             self.audit.create(
@@ -243,6 +272,15 @@ class ConsolidationService:
         if space_type == "project-space":
             return "fact", "long-term"
         return "episodic_summary", "short-term"
+
+    @staticmethod
+    def promotion_decision_baseline(*, event_origin: str, inferred_scope: str) -> tuple[str, str | None]:
+        if inferred_scope != "long-term":
+            return "promote", None
+        reason = SESSION_ONLY_ORIGINS.get(event_origin)
+        if reason is not None:
+            return "session_only", reason
+        return "promote", None
 
     @staticmethod
     def build_memory_content(summary: str) -> str:
