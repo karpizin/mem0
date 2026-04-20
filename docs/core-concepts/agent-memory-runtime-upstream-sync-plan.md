@@ -171,7 +171,7 @@ Validation completed:
 
 ### Layer 5: Presentations and Analytics
 
-Status: pending
+Status: completed on `codex/upstream-sync-integration`
 
 Transfer last:
 
@@ -192,6 +192,25 @@ Why last:
 
 Expected conflict level: low
 
+Applied scope:
+
+- builder presentation deck
+- executive presentation deck
+- short overview deck
+- presentation generator and tests
+- latest `10-hour` work summary
+
+Not carried over:
+
+- older `7-hour` and `9-hour` work summaries
+  because the `10-hour` summary is the more relevant consolidated artifact
+
+Validation completed:
+
+- `tests/test_project_presentations.py`: green
+- targeted lint on presentation generator/tests: green
+- presentation rebuild script: green
+
 ## Recommended Execution Sequence
 
 1. create a clean worktree for `codex/upstream-sync-integration`
@@ -208,3 +227,19 @@ Expected conflict level: low
 - `memory-runtime` tests pass on the integrated branch
 - `openclaw` integration remains functional on top of upstream’s latest state
 - local-model hardening is ported carefully instead of being overwritten or lost
+
+## Overall Status
+
+Layers completed:
+
+- Layer 1: Core Runtime and Core Documentation
+- Layer 2: OpenClaw Integration and Pilot Hardening
+- Layer 3: MCP Facade
+- Layer 4: Local LLM Hardening
+- Layer 5: Presentations and Analytics
+
+Integration branch is now ready for the next decision point:
+
+- keep iterating on `codex/upstream-sync-integration`
+- push it for review
+- or begin a final reconciliation / merge strategy back toward the main working line
