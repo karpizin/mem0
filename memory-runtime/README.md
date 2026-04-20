@@ -127,7 +127,7 @@ Readiness baseline теперь включает:
 
 Адаптерные endpoints фиксируют source-system contract для интеграций и работают поверх того же ingestion/recall pipeline.
 Для `OpenClaw` добавлен отдельный runtime-contract: плагин сначала вызывает `bootstrap`, затем использует `events/search/list/get/delete` как transport-поверхность вместо прямого подключения к `mem0`.
-Long-term `search/list` в adapter contract теперь возвращают только long-term candidates и не подтягивают `session-space`; уже консолидированные эпизоды не дублируются рядом с `memory_units`.
+Long-term `search/list` в adapter contract теперь возвращают только durable `memory_units` и не подтягивают `session-space` или raw `episode` noise; session-scoped `episode` candidates доступны только при явном `session_id`, а уже консолидированные эпизоды не дублируются рядом с `memory_units`.
 Consolidation baseline теперь умеет:
 - повышать decision-like `conversation_turn` до `decision`
 - повышать procedural guidance до `procedure`
@@ -188,6 +188,7 @@ make preflight
 make pilot-smoke
 make pilot-scenarios
 make pilot-negative-scenarios
+make openclaw-live-pilot
 make pilot-scorecard INPUT=/path/to/live_scorecard.json
 make quality-eval
 make lifecycle-eval
@@ -213,6 +214,7 @@ Mixed `conversation_turn` payloads, в которых `OpenClaw` присыла�
 `make pilot-scenarios` дополнительно сохраняет per-scenario trace bundle в `.artifacts/pilot_traces/pilot-scenarios/<run-name>/`.
 `make pilot-negative-scenarios` прогоняет 3 негативных pre-live сценария и сохраняет JSON report в `.artifacts/openclaw_negative_pilot_scenarios_report.json`.
 `make pilot-negative-scenarios` дополнительно сохраняет trace bundle в `.artifacts/pilot_traces/pilot-negative-scenarios/<run-name>/`.
+`make openclaw-live-pilot` прогоняет real OpenClaw pilot pack через `openclaw agent --local`, затем собирает runtime evidence, recall traces и итоговый JSON report в `.artifacts/openclaw_live_pilot_report.json`.
 `make pilot-scorecard INPUT=...` считает live-pilot summary и verdict по заполненному JSON scorecard.
 `make quality-eval` прогоняет 10 golden recall scenarios, печатает JSON report и служит регрессионным барьером для retrieval tuning.
 В quality report теперь есть не только `pass/fail`, но и `required_hit_rate`, `forbidden_leak_rate`, `avg_selected_count` и `mean_scenario_score`.

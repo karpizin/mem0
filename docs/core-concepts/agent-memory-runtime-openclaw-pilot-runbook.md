@@ -113,7 +113,8 @@ curl http://localhost:8080/v1/observability/stats
 
 Ожидаемый сигнал:
 
-- после capture и worker processing запись видна через `GET /v1/adapters/openclaw/memories`
+- после capture и worker processing durable запись видна через `GET /v1/adapters/openclaw/memories`
+- сырой `episode` не должен утекать в long-term `list/search` без явного `session_id`
 
 ### Сценарий 3. Session carryover
 
@@ -239,6 +240,29 @@ make pilot-scenarios
 - JSON report сохраняется в `.artifacts/openclaw_pilot_scenarios_report.json`
 - прогон можно использовать как pre-pilot gate до live OpenClaw session
 - per-scenario trace bundle сохраняется в `.artifacts/pilot_traces/pilot-scenarios/<run-name>/`
+
+### Real OpenClaw live pilot runner
+
+```bash
+cd /Users/slava/Documents/mem0-src/memory-runtime
+make openclaw-live-pilot
+```
+
+Результат:
+
+- runner использует текущий `openclaw-mem0` runtime-config из `~/.openclaw/openclaw.json`
+- реальные turn-ы прогоняются через `openclaw agent --local`
+- после каждого turn runner собирает evidence из `memory-runtime`
+- JSON report сохраняется в `.artifacts/openclaw_live_pilot_report.json`
+- raw artifacts сохраняются в `.artifacts/pilot_traces/openclaw-live-pilot/<run-name>/`
+
+Текущий live pack покрывает:
+
+- durable architecture decision
+- standing procedure recall
+- active session carryover
+- cross-session continuity
+- noise resistance
 
 ### Negative pilot scenarios
 

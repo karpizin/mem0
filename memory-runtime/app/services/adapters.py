@@ -358,13 +358,7 @@ class AdapterService:
             agent_id=agent_id,
             space_types=long_term_space_types,
         )
-        episode_rows = self.episodes.list_for_recall(
-            namespace_id=namespace_id,
-            agent_id=agent_id,
-            session_id=None,
-            space_types=long_term_space_types,
-        )
-        candidates: list[_AdapterMemoryCandidate] = [
+        return [
             _AdapterMemoryCandidate(
                 id=memory.id,
                 resource_kind="memory_unit",
@@ -378,29 +372,6 @@ class AdapterService:
             )
             for memory, space_type in memory_rows
         ]
-        known_ids = {candidate.id for candidate in candidates}
-        consolidated_episode_ids = {
-            memory.created_from_episode_id
-            for memory, _space_type in memory_rows
-            if memory.created_from_episode_id is not None
-        }
-        for episode, space_type in episode_rows:
-            if episode.id in known_ids or episode.id in consolidated_episode_ids:
-                continue
-            candidates.append(
-                _AdapterMemoryCandidate(
-                    id=episode.id,
-                    resource_kind="episode",
-                    space_type=space_type,
-                    memory=episode.raw_text,
-                    summary=episode.summary,
-                    score=None,
-                    created_at=episode.created_at,
-                    updated_at=episode.created_at,
-                    metadata={"session_id": episode.session_id, "space_type": space_type},
-                )
-            )
-        return candidates
 
     def _get_candidate(
         self,

@@ -369,6 +369,8 @@ class AdaptersApiTests(unittest.TestCase):
         )
         self.assertEqual(event.status_code, 201)
         episode_id = event.json()["event"]["episode_id"]
+        processed = WorkerRunner.run_pending_jobs()
+        self.assertGreaterEqual(processed, 1)
 
         search = self.client.post(
             "/v1/adapters/openclaw/search",
@@ -382,13 +384,21 @@ class AdaptersApiTests(unittest.TestCase):
         self.assertEqual(search.status_code, 200)
         search_payload = search.json()
         self.assertTrue(search_payload["results"])
-        self.assertEqual(search_payload["results"][0]["resource_kind"], "episode")
+        self.assertEqual(search_payload["results"][0]["resource_kind"], "memory_unit")
+        self.assertTrue(any("search, list, get, and delete" in item["memory"] for item in search_payload["results"]))
 
         listed = self.client.get(
             f"/v1/adapters/openclaw/memories?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
         )
         self.assertEqual(listed.status_code, 200)
-        self.assertTrue(any(item["id"] == episode_id for item in listed.json()["results"]))
+        self.assertFalse(any(item["id"] == episode_id for item in listed.json()["results"]))
+        self.assertTrue(
+            any(
+                item["resource_kind"] == "memory_unit"
+                and "search, list, get, and delete" in item["memory"]
+                for item in listed.json()["results"]
+            )
+        )
 
         fetched = self.client.get(
             f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
@@ -405,6 +415,48 @@ class AdaptersApiTests(unittest.TestCase):
             f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
         )
         self.assertEqual(missing.status_code, 404)
+
+    def test_openclaw_session_scoped_search_and_list_return_episode_candidates(self) -> None:
+        self.client.post(
+            "/v1/adapters/openclaw/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.openclaw_agent_id,
+                "session_id": "run_oc_session_contract",
+                "event_type": "conversation_turn",
+                "space_hint": "session-space",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": "Session-only scratchpad: compare retry timings before choosing the worker backoff window.",
+                    }
+                ],
+            },
+        )
+
+        search = self.client.post(
+            "/v1/adapters/openclaw/search",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.openclaw_agent_id,
+                "session_id": "run_oc_session_contract",
+                "query": "What scratchpad note exists for the worker backoff window?",
+                "limit": 5,
+            },
+        )
+        self.assertEqual(search.status_code, 200)
+        search_results = search.json()["results"]
+        self.assertTrue(search_results)
+        self.assertEqual(search_results[0]["resource_kind"], "episode")
+
+        listed = self.client.get(
+            f"/v1/adapters/openclaw/memories?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}&session_id=run_oc_session_contract"
+        )
+        self.assertEqual(listed.status_code, 200)
+        listed_results = listed.json()["results"]
+        self.assertTrue(listed_results)
+        self.assertTrue(all(item["resource_kind"] == "episode" for item in listed_results))
+        self.assertTrue(any("worker backoff window" in item["memory"] for item in listed_results))
 
     def test_long_term_search_and_list_exclude_session_memory_and_deduplicate_consolidated_episodes(self) -> None:
         self.client.post(

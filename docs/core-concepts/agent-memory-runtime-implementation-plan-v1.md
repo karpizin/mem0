@@ -1186,6 +1186,11 @@ Definition of Done:
   - localhost-safe HTTP tooling without proxy inheritance
   - `.venv`-aware pilot/eval scripts
   - migration-aware Postgres startup for Dockerized runtime
+- real OpenClaw scenario runner now exists as a repeatable live-pilot harness with:
+  - `openclaw agent --local` turns
+  - runtime evidence collection
+  - per-scenario artifacts
+  - machine-readable live pilot report
 
 Следующий rollout:
 
