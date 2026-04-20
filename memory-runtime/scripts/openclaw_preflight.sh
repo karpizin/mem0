@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="$ROOT_DIR/.artifacts"
 REPORT_PATH="$REPORT_DIR/openclaw_preflight_report.json"
 TMP_REPORT_PATH="$REPORT_PATH.tmp"
-PYTHON_BIN="${PYTHON:-python3}"
+PYTHON_BIN="$(bash "$ROOT_DIR/scripts/resolve_python.sh")"
 
 mkdir -p "$REPORT_DIR"
 

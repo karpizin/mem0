@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from uuid import uuid4
 
-import httpx
+from app.http_client import create_local_runtime_client
 
 
 def _wait_for_jobs(
@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-wait-seconds", type=float, default=10.0)
     args = parser.parse_args(argv)
 
-    with httpx.Client(base_url=args.base_url, timeout=10.0) as client:
+    with create_local_runtime_client(base_url=args.base_url, timeout=10.0) as client:
         report = run_continuity_benchmark(
             client,
             namespace_suffix=args.namespace_suffix,

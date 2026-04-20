@@ -1,6 +1,6 @@
 .PHONY: install-dev run run-worker run-worker-once test test-unittest lint format smoke test-e2e preflight pilot-smoke pilot-scenarios pilot-negative-scenarios pilot-scorecard quality-eval lifecycle-eval continuity-benchmark compare-eval reset-pilot snapshot-pilot restore-pilot show-pilot-snapshots inspect-memories inspect-memory-lifecycle explain-recall show-last-smoke show-last-quality-eval
 
-PYTHON ?= python3
+PYTHON ?= $(shell bash scripts/resolve_python.sh)
 PORT ?= 8080
 
 install-dev:

@@ -1,6 +1,6 @@
 """Create memory units, jobs, and audit log tables.
 
-Revision ID: 0003_create_memory_units_jobs_and_audit
+Revision ID: 0003_mem_units_jobs_audit
 Revises: 0002_create_episodes
 Create Date: 2026-04-20
 """
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0003_create_memory_units_jobs_and_audit"
+revision = "0003_mem_units_jobs_audit"
 down_revision = "0002_create_episodes"
 branch_labels = None
 depends_on = None

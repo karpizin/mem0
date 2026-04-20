@@ -58,6 +58,7 @@ docker compose up --build
 Примечание:
 
 - при первом старте worker может ждать готовности Postgres несколько секунд и ретраить подключение автоматически
+- runtime startup для Postgres теперь использует migration-aware init path вместо наивного schema bootstrap
 
 ### 2. Проверить runtime руками
 
@@ -185,6 +186,7 @@ make preflight
 - проверяется worker round-trip на тестовом событии
 - проверяется recall round-trip на том же контуре
 - JSON report сохраняется в `.artifacts/openclaw_preflight_report.json`
+- localhost probe не использует системные proxy env vars и не должен получать ложные `502` из-за proxy inheritance
 
 Если preflight возвращает `fail`, это больше не считается "непонятным" состоянием:
 

@@ -84,7 +84,7 @@ def test_explain_recall_formats_selection_explanations() -> None:
         def post(self, *args, **kwargs):
             return _Response()
 
-    with patch("app.inspect_memory.httpx.Client", _Client):
+    with patch("app.inspect_memory.create_local_runtime_client", return_value=_Client()):
         from app.inspect_memory import explain_recall
 
         report = explain_recall(

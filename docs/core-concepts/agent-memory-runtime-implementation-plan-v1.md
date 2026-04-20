@@ -1181,6 +1181,10 @@ Definition of Done:
   - promotion decision outcomes
   - retrieval selection
   - worker job lifecycle
+- pilot operational hardening now also covers:
+  - localhost-safe HTTP tooling without proxy inheritance
+  - `.venv`-aware pilot/eval scripts
+  - migration-aware Postgres startup for Dockerized runtime
 
 Следующий rollout:
 

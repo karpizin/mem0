@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHON_BIN="${PYTHON:-python3}"
+PYTHON_BIN="$(bash "$ROOT_DIR/scripts/resolve_python.sh")"
 
 cd "$ROOT_DIR"
 "$PYTHON_BIN" -m app.inspect_memory list "$@"

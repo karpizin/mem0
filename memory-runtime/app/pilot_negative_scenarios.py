@@ -6,10 +6,10 @@ import time
 from collections.abc import Callable
 from uuid import uuid4
 
-import httpx
 from sqlalchemy import select
 
 from app.database import get_session_factory
+from app.http_client import create_local_runtime_client
 from app.models.audit_log import AuditLog
 from app.models.memory_unit import MemoryUnit
 from app.pilot_artifacts import default_artifact_run_name, export_trace_bundle
@@ -338,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-wait-seconds", type=float, default=10.0)
     args = parser.parse_args(argv)
 
-    with httpx.Client(base_url=args.base_url, timeout=10.0) as client:
+    with create_local_runtime_client(base_url=args.base_url, timeout=10.0) as client:
         report = run_pilot_negative_scenarios(
             client,
             namespace_suffix=args.namespace_suffix,

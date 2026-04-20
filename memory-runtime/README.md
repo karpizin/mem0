@@ -51,6 +51,7 @@ cp .env.example .env
 По умолчанию локальный scaffold использует SQLite-файл для безопасного старта без внешней БД.
 Для Docker и реального runtime используется явный Postgres DSN из `.env`.
 `mem0 bridge` по умолчанию выключен и включается только явной конфигурацией.
+Локальные pilot/eval CLI теперь сначала используют `memory-runtime/.venv/bin/python`, если он существует, и только потом fallback-ятся на системный Python.
 
 ## Установка dev-зависимостей
 
@@ -94,6 +95,8 @@ Readiness baseline теперь включает:
 - healthcheck для `redis`
 - heartbeat-based healthcheck для `memory-worker`
 - `service_healthy` dependencies для API и worker
+- migration-aware startup path для Postgres, чтобы runtime не расходился со схемой Alembic при локальном compose-запуске
+  и чтобы Docker image мог сам применить/stamp schema state, потому что `alembic.ini` и `migrations/` теперь входят в image
 
 Для первого живого MVP-пилота с `OpenClaw` смотри runbook:
 - [agent-memory-runtime-openclaw-pilot-runbook.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-pilot-runbook.md)
@@ -202,6 +205,7 @@ make reset-pilot
 ```
 
 `make preflight` прогоняет единый runtime preflight check и сохраняет JSON report в `.artifacts/openclaw_preflight_report.json`.
+Localhost-facing pilot/eval tooling теперь использует HTTP clients с `trust_env=False`, чтобы системные proxy env vars не ломали сценарии на `127.0.0.1`.
 `make pilot-smoke` поднимает Docker stack, прогоняет synthetic OpenClaw pilot contour и сохраняет JSON report в `.artifacts/openclaw_pilot_smoke_report.json`.
 `make pilot-smoke` дополнительно сохраняет raw trace bundle в `.artifacts/pilot_traces/pilot-smoke/<run-name>/`.
 `make pilot-scenarios` прогоняет 5 наиболее важных OpenClaw pilot scenarios и сохраняет JSON report в `.artifacts/openclaw_pilot_scenarios_report.json`.

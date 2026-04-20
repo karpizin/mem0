@@ -4,10 +4,10 @@ import argparse
 import json
 from typing import Any
 
-import httpx
 from sqlalchemy import Select, desc, select
 
 from app.database import get_session_factory
+from app.http_client import create_local_runtime_client
 from app.models.memory_unit import MemoryUnit
 
 
@@ -58,7 +58,7 @@ def explain_recall(
     query: str,
     context_budget_tokens: int,
 ) -> dict[str, Any]:
-    with httpx.Client(base_url=base_url, timeout=15.0) as client:
+    with create_local_runtime_client(base_url=base_url, timeout=15.0) as client:
         response = client.post(
             "/v1/adapters/openclaw/recall",
             json={

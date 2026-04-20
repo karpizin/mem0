@@ -5,12 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARTIFACT_DIR="$ROOT_DIR/.artifacts"
 SNAPSHOT_ROOT="$ARTIFACT_DIR/pilot_snapshots"
 
+PYTHON_BIN="$(bash "$ROOT_DIR/scripts/resolve_python.sh")"
+
 RAW_NAME="${1:-}"
 if [[ -z "$RAW_NAME" ]]; then
-  RAW_NAME="$(python -m app.pilot_snapshots --default-name)"
+  RAW_NAME="$("$PYTHON_BIN" -m app.pilot_snapshots --default-name)"
 fi
 
-SNAPSHOT_NAME="$(python -m app.pilot_snapshots --sanitize "$RAW_NAME")"
+SNAPSHOT_NAME="$("$PYTHON_BIN" -m app.pilot_snapshots --sanitize "$RAW_NAME")"
 SNAPSHOT_DIR="$SNAPSHOT_ROOT/$SNAPSHOT_NAME"
 REPORT_DIR="$SNAPSHOT_DIR/reports"
 
@@ -42,7 +44,7 @@ docker compose exec -T memory-api python -c \
   "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/v1/observability/stats').read().decode())" \
   > "$SNAPSHOT_DIR/observability_stats.json"
 
-python -m app.pilot_snapshots \
+"$PYTHON_BIN" -m app.pilot_snapshots \
   --write-manifest \
   --snapshot-dir "$SNAPSHOT_DIR" \
   --name "$SNAPSHOT_NAME" >/dev/null

@@ -5,8 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import httpx
-
+from app.http_client import create_local_runtime_client
 
 def load_scenarios(path: str | Path) -> list[dict[str, Any]]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -106,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     scenarios = load_scenarios(args.scenarios)
-    with httpx.Client(base_url=args.base_url, timeout=10.0) as client:
+    with create_local_runtime_client(base_url=args.base_url, timeout=10.0) as client:
         report = run_quality_eval(client, scenarios=scenarios)
 
     print(json.dumps(report, ensure_ascii=False))
