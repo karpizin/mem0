@@ -136,6 +136,7 @@ Current implementation status:
 
 - implemented as an explicit internal decision layer in consolidation
 - provenance, low-trust, and transientness are now evaluated in one place
+- low-value assistant/tool operational notes are also demoted through the same decision layer
 - long-term candidates can now be:
   - promoted
   - demoted to `session_only`
@@ -196,6 +197,7 @@ In other words:
 
 - provenance handles junk amplification
 - low-trust handles poisoning
+- low-value heuristics handle truthful-but-noisy operational chatter
 - later promotion logic handles usefulness
 
 ## Initial Test Plan

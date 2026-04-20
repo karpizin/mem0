@@ -106,6 +106,37 @@ TRANSIENT_PATTERNS = {
         "current session only",
     ),
 }
+ACKNOWLEDGEMENT_PATTERNS = (
+    "ok",
+    "okay",
+    "sounds good",
+    "got it",
+    "thank you",
+    "thanks",
+    "great",
+    "nice",
+    "понял",
+    "хорошо",
+    "спасибо",
+    "отлично",
+    "принято",
+    "ясно",
+)
+OPERATIONAL_STATUS_PATTERNS = (
+    "request timed out before a response was generated",
+    "request timed out",
+    "profile timed out",
+    "provider timed out",
+    "still syncing",
+    "daemon not running",
+    "retry after startup",
+    "starting up",
+    "initializing",
+    "download at ",
+    "download is at ",
+    "currently syncing",
+    "in progress",
+)
 
 
 logger = logging.getLogger(__name__)
@@ -415,6 +446,17 @@ class ConsolidationService:
             if inferred_scope == "long-term"
             else None
         )
+        low_value_reason = (
+            cls.detect_low_value_reason(
+                event_origin=event_origin,
+                content=content,
+                kind=kind,
+                event_type=event_type,
+                space_type=space_type,
+            )
+            if inferred_scope == "long-term"
+            else None
+        )
         signals = {
             "event_origin": event_origin,
             "inferred_scope": inferred_scope,
@@ -423,6 +465,7 @@ class ConsolidationService:
             "space_type": space_type,
             "low_trust": low_trust_reason is not None,
             "transient": transient_reason is not None,
+            "low_value": low_value_reason is not None,
             "origin_demoted": event_origin in SESSION_ONLY_ORIGINS,
         }
 
@@ -459,6 +502,14 @@ class ConsolidationService:
                 signals=signals,
             )
 
+        if low_value_reason is not None:
+            return PromotionDecision(
+                decision="session_only",
+                effective_scope="short-term",
+                reason=low_value_reason,
+                signals=signals,
+            )
+
         return PromotionDecision(
             decision="promote",
             effective_scope=inferred_scope,
@@ -484,6 +535,37 @@ class ConsolidationService:
         for reason, phrases in TRANSIENT_PATTERNS.items():
             if any(phrase in normalized for phrase in phrases):
                 return reason
+        return None
+
+    @classmethod
+    def detect_low_value_reason(
+        cls,
+        *,
+        event_origin: str,
+        content: str,
+        kind: str,
+        event_type: str,
+        space_type: str,
+    ) -> str | None:
+        if event_origin not in {"agent_output", "tool_output", "operator_template"}:
+            return None
+        if kind in {"decision", "procedure"} or event_type in {"architecture_decision", "decision", "policy_update"}:
+            return None
+        if space_type not in {"project-space", "shared-space", "agent-core"}:
+            return None
+
+        normalized = cls._normalize_text(content)
+        tokens = TOKEN_RE.findall(normalized)
+
+        if (
+            len(tokens) <= 6
+            and normalized in ACKNOWLEDGEMENT_PATTERNS
+        ):
+            return "assistant_ack_not_durable"
+
+        if any(phrase in normalized for phrase in OPERATIONAL_STATUS_PATTERNS):
+            return "operational_status_not_durable"
+
         return None
 
     @staticmethod

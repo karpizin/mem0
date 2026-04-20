@@ -321,3 +321,34 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertIn("temporary_scratch_not_durable", str(audit_rows[0][1]))
         self.assertTrue(any('"event": "consolidation.promotion_decision"' in line for line in captured.output))
         self.assertTrue(any('"event": "consolidation.demoted_session_only"' in line for line in captured.output))
+
+    def test_worker_demotes_operational_status_to_session_only(self) -> None:
+        payload = {
+            "namespace_id": self.namespace_id,
+            "agent_id": self.agent_id,
+            "session_id": "run_789",
+            "source_system": "openclaw",
+            "event_type": "conversation_turn",
+            "space_hint": "project-space",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "Request timed out before a response was generated. Please try again.",
+                }
+            ],
+        }
+        self.client.post("/v1/events", json=payload)
+
+        processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(processed, 1)
+        with get_engine().connect() as connection:
+            memory_units_count = connection.execute(text("SELECT COUNT(*) FROM memory_units")).scalar_one()
+            audit_rows = connection.execute(
+                text("SELECT action, details_json FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
+
+        self.assertEqual(memory_units_count, 0)
+        self.assertEqual(len(audit_rows), 1)
+        self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
+        self.assertIn("operational_status_not_durable", str(audit_rows[0][1]))

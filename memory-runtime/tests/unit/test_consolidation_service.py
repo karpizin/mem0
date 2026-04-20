@@ -160,3 +160,50 @@ class ConsolidationServiceContractTests(unittest.TestCase):
         self.assertEqual(decision.decision, "reject")
         self.assertEqual(decision.reason, "instruction_override")
         self.assertEqual(decision.effective_scope, "none")
+
+    def test_evaluate_promotion_decision_demotes_acknowledgement_like_agent_output(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Sounds good",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+        )
+
+        self.assertEqual(decision.decision, "session_only")
+        self.assertEqual(decision.reason, "assistant_ack_not_durable")
+        self.assertEqual(decision.effective_scope, "short-term")
+
+    def test_evaluate_promotion_decision_demotes_operational_status_agent_output(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Request timed out before a response was generated. Please try again.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+        )
+
+        self.assertEqual(decision.decision, "session_only")
+        self.assertEqual(decision.reason, "operational_status_not_durable")
+        self.assertEqual(decision.effective_scope, "short-term")
+
+    def test_evaluate_promotion_decision_keeps_user_reported_operational_issue_promotable(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="user_input",
+            inferred_scope="long-term",
+            content="Request timed out before a response was generated when we used the old OpenClaw provider.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+        )
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertIsNone(decision.reason)
