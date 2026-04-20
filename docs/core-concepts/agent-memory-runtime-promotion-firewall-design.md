@@ -141,6 +141,11 @@ Current implementation status:
   - rejected
 - `session-space` / inferred short-term candidates continue to materialize as short-term memory units
   so existing short-term lifecycle behavior is preserved
+- structured logs should capture:
+  - incoming event provenance
+  - promotion decision and signals
+  - final consolidation outcome
+  - worker job execution path
 
 ### Step 3: Rescue Loop
 

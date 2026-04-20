@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.database import get_session_factory
+from app.logging_utils import log_event
 from app.models.episode import Episode
 from app.repositories.jobs import JobRepository
 from app.repositories.memory_units import MemoryUnitRepository
 from app.services.consolidation import ConsolidationService
 from app.services.lifecycle import LifecycleService
 from app.telemetry.metrics import increment_metric
+
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerRunner:
@@ -25,6 +31,13 @@ class WorkerRunner:
 
             for job in jobs.list_pending():
                 jobs.mark_running(job)
+                log_event(
+                    logger,
+                    "worker.job.started",
+                    job_id=job.id,
+                    job_type=job.job_type,
+                    payload=job.payload_json,
+                )
                 try:
                     if job.job_type == "memory_consolidation":
                         episode = session.get(Episode, job.payload_json["episode_id"])
@@ -44,10 +57,26 @@ class WorkerRunner:
                     increment_metric("jobs_processed_total")
                     session.commit()
                     processed += 1
+                    log_event(
+                        logger,
+                        "worker.job.completed",
+                        job_id=job.id,
+                        job_type=job.job_type,
+                        processed=processed,
+                    )
                 except Exception as exc:  # noqa: BLE001
                     jobs.mark_failed(job, str(exc))
                     increment_metric("jobs_failed_total")
                     session.commit()
+                    log_event(
+                        logger,
+                        "worker.job.failed",
+                        level=logging.ERROR,
+                        job_id=job.id,
+                        job_type=job.job_type,
+                        payload=job.payload_json,
+                        error=str(exc),
+                    )
                     raise
             return processed
         finally:

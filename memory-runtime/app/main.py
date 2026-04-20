@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.database import init_database
 from app.dependencies import get_app_settings
+from app.logging_utils import configure_logging
 from app.routers.adapters import router as adapters_router
 from app.routers.events import router as events_router
 from app.routers.health import router as health_router
@@ -14,6 +15,7 @@ from app.routers.recall import router as recall_router
 
 def create_app() -> FastAPI:
     settings = get_app_settings()
+    configure_logging(level="DEBUG" if settings.debug else "INFO")
 
     app = FastAPI(
         title=settings.app_name,

@@ -116,16 +116,17 @@ class RecallApiTests(unittest.TestCase):
         reset_database_caches()
 
     def test_recall_returns_structured_memory_brief(self) -> None:
-        response = self.client.post(
-            "/v1/recall",
-            json={
-                "namespace_id": self.namespace_id,
-                "agent_id": self.agent_id,
-                "session_id": "run_123",
-                "query": "What architecture decisions already exist about the memory runtime?",
-                "context_budget_tokens": 1200
-            },
-        )
+        with self.assertLogs("app.services.retrieval", level="INFO") as captured:
+            response = self.client.post(
+                "/v1/recall",
+                json={
+                    "namespace_id": self.namespace_id,
+                    "agent_id": self.agent_id,
+                    "session_id": "run_123",
+                    "query": "What architecture decisions already exist about the memory runtime?",
+                    "context_budget_tokens": 1200
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -151,6 +152,7 @@ class RecallApiTests(unittest.TestCase):
         self.assertTrue(payload["trace"]["selection_explanations"])
         self.assertIn("decisive_signal", payload["trace"]["selection_explanations"][0])
         self.assertIn("why", payload["trace"]["selection_explanations"][0])
+        self.assertTrue(any('"event": "retrieval.completed"' in line for line in captured.output))
 
     def test_positive_feedback_promotes_useful_episode_in_later_recall(self) -> None:
         older = self.client.post(

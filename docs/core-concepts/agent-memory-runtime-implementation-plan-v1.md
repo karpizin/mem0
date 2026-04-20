@@ -1176,6 +1176,11 @@ Definition of Done:
   - inferred memory scope
 - project/shared transient notes now demote to `session_only` instead of polluting long-term memory
 - low-trust poisoning patterns now flow through the same explicit decision layer instead of a separate implicit branch
+- structured JSON logs now cover:
+  - ingestion
+  - promotion decision outcomes
+  - retrieval selection
+  - worker job lifecycle
 
 Следующий rollout:
 

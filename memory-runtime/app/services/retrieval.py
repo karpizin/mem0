@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -7,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.logging_utils import log_event
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.episodes import EpisodeRepository
 from app.repositories.namespaces import NamespaceRepository
@@ -70,6 +72,9 @@ MAX_ITEMS_BY_SLOT = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class RetrievalCandidate:
     episode_id: str
@@ -99,6 +104,16 @@ class RetrievalService:
         space_filters = self.resolve_space_filters(
             namespace_mode=namespace.mode,
             requested_space_filter=payload.space_filter,
+        )
+        log_event(
+            logger,
+            "retrieval.started",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            session_id=payload.session_id,
+            space_filters=space_filters,
+            context_budget_tokens=payload.context_budget_tokens,
+            query=payload.query,
         )
         rows = self.episodes.list_for_recall(
             namespace_id=payload.namespace_id,
@@ -153,6 +168,19 @@ class RetrievalService:
         increment_metric("recall_requests_total")
         increment_metric("recall_candidates_total", len(candidates))
         increment_metric("recall_selected_total", selected_count)
+        log_event(
+            logger,
+            "retrieval.completed",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            session_id=payload.session_id,
+            candidate_count=len(candidates),
+            external_candidate_count=len(external_candidates),
+            selected_count=selected_count,
+            selected_episode_ids=selected_episode_ids,
+            selected_space_types=selected_space_types,
+            slot_counts={slot: len(items) for slot, items in brief_dict.items()},
+        )
         response = RecallResponse(
             brief=MemoryBrief(**brief_dict),
             trace=RecallTrace(
@@ -200,6 +228,16 @@ class RetrievalService:
         increment_metric(
             "recall_feedback_positive_total" if payload.helpful else "recall_feedback_negative_total",
             len(payload.episode_ids),
+        )
+        log_event(
+            logger,
+            "retrieval.feedback_recorded",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            helpful=payload.helpful,
+            recorded_count=len(payload.episode_ids),
+            episode_ids=payload.episode_ids,
+            query=payload.query,
         )
         return RecallFeedbackResponse(recorded_count=len(payload.episode_ids), helpful=payload.helpful)
 

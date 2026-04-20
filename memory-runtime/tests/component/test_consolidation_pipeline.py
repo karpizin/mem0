@@ -305,7 +305,8 @@ class ConsolidationPipelineTests(unittest.TestCase):
         }
         self.client.post("/v1/events", json=payload)
 
-        processed = WorkerRunner.run_pending_jobs()
+        with self.assertLogs("app.services.consolidation", level="INFO") as captured:
+            processed = WorkerRunner.run_pending_jobs()
 
         self.assertEqual(processed, 1)
         with get_engine().connect() as connection:
@@ -318,3 +319,5 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(len(audit_rows), 1)
         self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
         self.assertIn("temporary_scratch_not_durable", str(audit_rows[0][1]))
+        self.assertTrue(any('"event": "consolidation.promotion_decision"' in line for line in captured.output))
+        self.assertTrue(any('"event": "consolidation.demoted_session_only"' in line for line in captured.output))

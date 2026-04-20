@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from app.workers import main as worker_main
 
@@ -28,11 +28,20 @@ class WorkerMainTests(unittest.TestCase):
 
     @patch("app.workers.main.time.sleep")
     @patch("app.workers.main.init_database", side_effect=[RuntimeError("db down"), None])
-    def test_initialize_database_with_retry_retries_until_success(self, init_database, sleep) -> None:
+    @patch("app.workers.main.log_event")
+    def test_initialize_database_with_retry_retries_until_success(self, log_event, init_database, sleep) -> None:
         worker_main.initialize_database_with_retry(poll_seconds=0.5, max_attempts=3)
 
         self.assertEqual(init_database.call_count, 2)
         sleep.assert_called_once_with(0.5)
+        log_event.assert_any_call(
+            worker_main.logger,
+            "worker.database.retrying",
+            level=ANY,
+            attempts=1,
+            poll_seconds=0.5,
+            error="db down",
+        )
 
     @patch("app.workers.main.time.sleep")
     @patch("app.workers.main.init_database", side_effect=RuntimeError("db down"))

@@ -191,6 +191,25 @@ make preflight
 - отдельные e2e tests уже проверяют сценарий `API жив, worker не обрабатывает jobs`
 - stalled/running degradation отдельно валидируется через `/v1/observability/stats`
 
+### Runtime logs для разборов
+
+```bash
+cd /Users/slava/Documents/mem0-src/memory-runtime
+docker compose logs memory-api
+docker compose logs memory-worker
+```
+
+Наиболее полезные structured log events во время пилота:
+
+- `ingestion.received`
+- `ingestion.deduplicated`
+- `consolidation.promotion_decision`
+- `consolidation.demoted_session_only`
+- `consolidation.rejected`
+- `consolidation.created`
+- `retrieval.completed`
+- `worker.job.failed`
+
 ### Full synthetic pilot smoke
 
 ```bash

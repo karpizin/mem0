@@ -218,6 +218,32 @@ Adversarial eval suite теперь покрывает instruction override, pro
 `make snapshot-pilot NAME=...` сохраняет SQL dump pilot-базы, observability snapshot и текущие pilot reports в `.artifacts/pilot_snapshots/<name>/`.
 `make restore-pilot SNAPSHOT=...` восстанавливает snapshot обратно в compose Postgres и возвращает связанные pilot reports в `.artifacts/`.
 `make show-pilot-snapshots` показывает доступные snapshots и их manifest metadata.
+
+## Логи и диагностика
+
+`memory-runtime` теперь пишет структурированные JSON-логи через стандартный Python logger.
+Это помогает разбирать непонятные состояния в тестах и в live pilot без ручного воспроизведения.
+
+Ключевые события, которые уже логируются:
+
+- ingestion: `ingestion.received`, `ingestion.deduplicated`, `ingestion.persisted`
+- consolidation: `consolidation.started`, `consolidation.promotion_decision`, `consolidation.created`, `consolidation.merged`, `consolidation.superseded`, `consolidation.demoted_session_only`, `consolidation.rejected`
+- retrieval: `retrieval.started`, `retrieval.completed`, `retrieval.feedback_recorded`
+- worker: `worker.job.started`, `worker.job.completed`, `worker.job.failed`, `worker.database.retrying`
+
+Минимальный debug flow для локального разбора:
+
+```bash
+cd /Users/slava/Documents/mem0-src/memory-runtime
+docker compose logs memory-api
+docker compose logs memory-worker
+```
+
+Особенно полезно смотреть логи вместе с:
+
+- `/v1/observability/stats`
+- `/metrics`
+- trace bundle из `.artifacts/pilot_traces/...`
 `make inspect-memories ARGS="..."` печатает последние `memory_units` с key debugging полями прямо из БД.
 `make inspect-memory-lifecycle ARGS="..."` печатает archived/superseded memory units для разбора forgetting и contradiction flows.
 `make explain-recall ARGS="..."` запускает recall и печатает `selection_explanations` с `slot`, `decisive_signal` и `why`.

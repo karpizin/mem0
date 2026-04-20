@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -7,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.episode import Episode
+from app.logging_utils import log_event
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.jobs import JobRepository
 from app.repositories.memory_events import MemoryEventRepository
@@ -106,6 +108,9 @@ TRANSIENT_PATTERNS = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class PromotionDecision:
     decision: str
@@ -128,6 +133,16 @@ class ConsolidationService:
         event = self.events.get_by_id(episode.start_event_id)
         event_origin = event.event_origin if event is not None else "user_input"
         content = self.build_memory_content(episode.summary)
+        log_event(
+            logger,
+            "consolidation.started",
+            episode_id=episode.id,
+            namespace_id=episode.namespace_id,
+            agent_id=episode.agent_id,
+            space_type=space_type,
+            event_type=event_type,
+            event_origin=event_origin,
+        )
         kind, scope = self.infer_memory_attributes(
             space_type=space_type,
             event_type=event_type,
@@ -140,6 +155,22 @@ class ConsolidationService:
             kind=kind,
             event_type=event_type,
             space_type=space_type,
+        )
+        log_event(
+            logger,
+            "consolidation.promotion_decision",
+            episode_id=episode.id,
+            namespace_id=episode.namespace_id,
+            agent_id=episode.agent_id,
+            space_type=space_type,
+            event_type=event_type,
+            event_origin=event_origin,
+            kind=kind,
+            inferred_scope=scope,
+            decision=promotion.decision,
+            effective_scope=promotion.effective_scope,
+            reason=promotion.reason,
+            signals=promotion.signals,
         )
         if promotion.decision == "session_only":
             self.audit.create(
@@ -159,6 +190,16 @@ class ConsolidationService:
                 },
             )
             self.session.flush()
+            log_event(
+                logger,
+                "consolidation.demoted_session_only",
+                episode_id=episode.id,
+                namespace_id=episode.namespace_id,
+                agent_id=episode.agent_id,
+                event_origin=event_origin,
+                reason=promotion.reason,
+                signals=promotion.signals,
+            )
             return "ignored", episode.id
         if promotion.decision == "reject":
             self.audit.create(
@@ -178,6 +219,16 @@ class ConsolidationService:
                 },
             )
             self.session.flush()
+            log_event(
+                logger,
+                "consolidation.rejected",
+                episode_id=episode.id,
+                namespace_id=episode.namespace_id,
+                agent_id=episode.agent_id,
+                event_origin=event_origin,
+                reason=promotion.reason,
+                signals=promotion.signals,
+            )
             return "ignored", episode.id
         scope = promotion.effective_scope
         merge_key = self.normalize_merge_key(content)
@@ -227,6 +278,17 @@ class ConsolidationService:
             self._sync_to_mem0(memory_unit, episode, space_type)
             increment_metric("consolidation_created_total")
             self.session.flush()
+            log_event(
+                logger,
+                "consolidation.created",
+                episode_id=episode.id,
+                namespace_id=episode.namespace_id,
+                agent_id=episode.agent_id,
+                memory_unit_id=memory_unit.id,
+                kind=kind,
+                scope=scope,
+                merge_key=merge_key,
+            )
             return "created", memory_unit.id
 
         if contradictory is not None:
@@ -264,6 +326,18 @@ class ConsolidationService:
             self._sync_to_mem0(memory_unit, episode, space_type)
             increment_metric("consolidation_created_total")
             self.session.flush()
+            log_event(
+                logger,
+                "consolidation.superseded",
+                episode_id=episode.id,
+                namespace_id=episode.namespace_id,
+                agent_id=episode.agent_id,
+                memory_unit_id=memory_unit.id,
+                supersedes_memory_id=contradictory.id,
+                kind=kind,
+                scope=scope,
+                merge_key=merge_key,
+            )
             return "superseded", memory_unit.id
 
         existing.summary = episode.summary
@@ -288,6 +362,17 @@ class ConsolidationService:
         self._sync_to_mem0(existing, episode, space_type)
         increment_metric("consolidation_merged_total")
         self.session.flush()
+        log_event(
+            logger,
+            "consolidation.merged",
+            episode_id=episode.id,
+            namespace_id=episode.namespace_id,
+            agent_id=episode.agent_id,
+            memory_unit_id=existing.id,
+            kind=kind,
+            scope=scope,
+            merge_key=merge_key,
+        )
         return "merged", existing.id
 
     @staticmethod

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.logging_utils import log_event
 from app.repositories.agents import AgentRepository
 from app.repositories.episodes import EpisodeRepository
 from app.repositories.jobs import JobRepository
@@ -17,6 +19,9 @@ from app.schemas.event import EventCreate, EventMessage, EventRead
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+logger = logging.getLogger(__name__)
 
 
 class IngestionService:
@@ -68,6 +73,22 @@ class IngestionService:
             event_origin=event_origin,
             normalized_payload=normalized_payload,
         )
+        log_event(
+            logger,
+            "ingestion.received",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            session_id=payload.session_id,
+            project_id=project_id,
+            source_system=payload.source_system.strip().lower(),
+            event_type=payload.event_type.strip().lower(),
+            event_origin=event_origin,
+            space_hint=payload.space_hint,
+            resolved_space_type=space.space_type if space else None,
+            dedupe_key=dedupe_key,
+            message_count=len(normalized_messages),
+            message_roles=[message.role for message in normalized_messages],
+        )
 
         existing_event = self.events.get_by_dedupe_key(
             namespace_id=payload.namespace_id,
@@ -78,6 +99,16 @@ class IngestionService:
             episode = self.episodes.get_by_event_id(existing_event.id)
             if episode is None:
                 raise LookupError("Existing deduplicated event is missing its episode")
+            log_event(
+                logger,
+                "ingestion.deduplicated",
+                namespace_id=payload.namespace_id,
+                agent_id=payload.agent_id,
+                session_id=payload.session_id,
+                event_id=existing_event.id,
+                episode_id=episode.id,
+                dedupe_key=dedupe_key,
+            )
             return self._build_event_read(existing_event, episode_id=episode.id)
 
         event = self.events.create(
@@ -117,6 +148,18 @@ class IngestionService:
 
         self.session.commit()
         self.session.refresh(event)
+        log_event(
+            logger,
+            "ingestion.persisted",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            session_id=payload.session_id,
+            event_id=event.id,
+            episode_id=episode.id,
+            event_origin=event_origin,
+            resolved_space_type=space.space_type if space else None,
+            token_count=episode.token_count,
+        )
 
         return self._build_event_read(event, episode_id=episode.id)
 

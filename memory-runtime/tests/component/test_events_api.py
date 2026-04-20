@@ -102,8 +102,9 @@ class EventsApiTests(unittest.TestCase):
             ],
         }
 
-        first = self.client.post("/v1/events", json=payload)
-        second = self.client.post("/v1/events", json=payload)
+        with self.assertLogs("app.services.ingestion", level="INFO") as captured:
+            first = self.client.post("/v1/events", json=payload)
+            second = self.client.post("/v1/events", json=payload)
 
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 201)
@@ -112,6 +113,7 @@ class EventsApiTests(unittest.TestCase):
         self.assertEqual(first_payload["id"], second_payload["id"])
         self.assertEqual(first_payload["episode_id"], second_payload["episode_id"])
         self.assertEqual(first_payload["dedupe_key"], second_payload["dedupe_key"])
+        self.assertTrue(any('"event": "ingestion.deduplicated"' in line for line in captured.output))
 
     def test_event_ingestion_persists_explicit_event_origin(self) -> None:
         response = self.client.post(
