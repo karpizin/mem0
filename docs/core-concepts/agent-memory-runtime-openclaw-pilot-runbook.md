@@ -29,6 +29,25 @@
 - новый запуск / новая сессия получает полезный recall
 - диагностика проблем возможна через API и метрики
 
+## Текущий Live Status
+
+По состоянию на `2026-04-21` живой `OpenClaw` contour уже подтвержден:
+
+- `OpenClaw` реально подключается к `memory-runtime` в `runtime` mode
+- real turn-ы через `openclaw agent --local` доходят до `ingestion -> consolidation -> recall`
+- structured logs и observability дают достаточно сигналов для разбора live regressions
+- критичный blocker с утечкой raw `episode` в long-term adapter `list/search` закрыт
+
+Последний live pack дал результат `4/5`:
+
+- `noise-resistance` теперь проходит на реальном контуре
+- remaining fail пришел не из runtime semantics, а из preview-truncation в live runner criteria для durable architecture memory
+
+Практический вывод:
+
+- runtime уже готов к следующему содержательному live pilot
+- следующий шаг — не новый инфраструктурный hardening, а сценарный live прогон с фиксацией findings
+
 ## Состав пилота
 
 Минимальный контур:
@@ -255,6 +274,8 @@ make openclaw-live-pilot
 - после каждого turn runner собирает evidence из `memory-runtime`
 - JSON report сохраняется в `.artifacts/openclaw_live_pilot_report.json`
 - raw artifacts сохраняются в `.artifacts/pilot_traces/openclaw-live-pilot/<run-name>/`
+- runner теперь имеет отдельный process timeout guard, чтобы зависший `openclaw agent` не блокировал весь pilot бесконечно
+- long-term verification в live pack опирается на durable adapter surface и не считает raw `episode` из long-term `list/search` допустимым результатом
 
 Текущий live pack покрывает:
 

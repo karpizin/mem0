@@ -215,6 +215,7 @@ Mixed `conversation_turn` payloads, в которых `OpenClaw` присыла�
 `make pilot-negative-scenarios` прогоняет 3 негативных pre-live сценария и сохраняет JSON report в `.artifacts/openclaw_negative_pilot_scenarios_report.json`.
 `make pilot-negative-scenarios` дополнительно сохраняет trace bundle в `.artifacts/pilot_traces/pilot-negative-scenarios/<run-name>/`.
 `make openclaw-live-pilot` прогоняет real OpenClaw pilot pack через `openclaw agent --local`, затем собирает runtime evidence, recall traces и итоговый JSON report в `.artifacts/openclaw_live_pilot_report.json`.
+Live runner теперь имеет отдельный process-timeout guard и durable-only validation для long-term adapter surface, чтобы зависший CLI или raw `episode` leakage не искажали verdict пилота.
 `make pilot-scorecard INPUT=...` считает live-pilot summary и verdict по заполненному JSON scorecard.
 `make quality-eval` прогоняет 10 golden recall scenarios, печатает JSON report и служит регрессионным барьером для retrieval tuning.
 В quality report теперь есть не только `pass/fail`, но и `required_hit_rate`, `forbidden_leak_rate`, `avg_selected_count` и `mean_scenario_score`.

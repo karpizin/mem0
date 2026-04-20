@@ -868,6 +868,28 @@ Definition of Done:
 - live pilot scenarios теперь частично автоматизированы и не зависят только от ручного walkthrough
 - raw trace bundles теперь сохраняются отдельно от summary report и могут быть использованы для post-pilot forensic разборов
 
+### Real OpenClaw Live Pilot Runner
+
+Для живого `OpenClaw` contour теперь есть отдельный runner:
+
+- `make openclaw-live-pilot`
+- runner использует реальный `openclaw-mem0` runtime-config из `~/.openclaw/openclaw.json`
+- сценарии идут через `openclaw agent --local`, а не через synthetic adapter-only flow
+- по каждому сценарию сохраняются raw turn payloads, recall traces, memory list snapshots и общий manifest
+- process timeout guard не дает зависшему `openclaw agent` повесить весь pilot бесконечно
+
+Статус:
+
+- `completed`
+
+Подтверждение:
+
+- live runner уже прогнан на реальном локальном `OpenClaw`
+- подтвержден реальный путь `OpenClaw -> runtime adapter -> ingestion -> consolidation -> recall`
+- отдельный live regression с утечкой raw `episode` в long-term adapter surface найден и исправлен
+- `noise resistance` теперь проходит на живом контуре после durable-only guardrails в adapter `list/search`
+- remaining live issue после последнего прогона относится к preview-truncation в evaluation criteria runner-а, а не к runtime storage semantics
+
 ### Negative Pilot Scenario Gate
 
 До живого pilot в проект добавлен отдельный negative scenario gate:
