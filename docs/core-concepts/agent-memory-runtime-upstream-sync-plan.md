@@ -135,7 +135,7 @@ Validation completed:
 
 ### Layer 4: Local LLM Hardening
 
-Status: pending manual reconcile
+Status: completed on `codex/upstream-sync-integration`
 
 Transfer fourth, manually:
 
@@ -149,6 +149,25 @@ Why manual handling is required:
 - these commits should be ported as a manual reconcile against current upstream implementations
 
 Expected conflict level: high
+
+Applied scope:
+
+- robust `remove_code_blocks` / `extract_json` behavior for local-model wrappers
+- `OllamaLLM` JSON-path hardening for chatty local outputs
+- editable-install `__version__` fallback
+- targeted docs note for Ollama local-companion guide
+
+Intentionally not included:
+
+- `chunk mode`
+- entry granularity changes in `mem0.memory.main`
+- prompt/config changes related to chunk extraction
+
+Validation completed:
+
+- `tests/test_chatty_llm_parsing.py`: green
+- `tests/llms/test_ollama.py`: green
+- targeted lint on touched files: green
 
 ### Layer 5: Presentations and Analytics
 

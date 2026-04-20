@@ -118,18 +118,19 @@ class TestRemoveCodeBlocks:
         parsed = json.loads(result)
         assert parsed == {"memory": []}
 
-    def test_think_tags_before_code_block_not_handled(self):
-        """Think tags before code block cause regex to miss — fallback needed.
-
-        This is a known limitation of remove_code_blocks: it matches the code
-        block regex first, and only strips think tags from the result. When
-        think tags come before the code block, the regex fails entirely.
-        The fallback chain (extract_json) handles this case.
-        """
+    def test_think_tags_before_code_block_are_handled(self):
+        """Think tags before a code block are removed before block extraction."""
         text = '<think>reasoning here</think>\n```json\n{"memory": []}\n```'
         result = remove_code_blocks(text)
-        with pytest.raises(json.JSONDecodeError):
-            json.loads(result)
+        parsed = json.loads(result)
+        assert parsed == {"memory": []}
+
+    def test_chatty_text_around_code_block_is_handled(self):
+        """remove_code_blocks now extracts the first embedded fenced block."""
+        text = 'Sure, here it is:\n```json\n{"memory": []}\n```\nDone.'
+        result = remove_code_blocks(text)
+        parsed = json.loads(result)
+        assert parsed == {"memory": []}
 
 
 # --- Test the full fallback chain (remove_code_blocks -> extract_json) ---
