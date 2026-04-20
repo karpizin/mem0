@@ -42,6 +42,8 @@
 - `suspected cause:` the plugin-side pre-prompt recall budget is too tight for the current live OpenClaw prompt/context size and recall strategy
 - `confidence:` `high`
 - `possible fix direction:` make the timeout configurable, add plugin-side latency instrumentation, and reduce unnecessary recall work on the cold-start path
+- `current mitigation status:` `implemented baseline fix on 2026-04-21 via configurable recallTimeoutMs plus success/timeout telemetry; rerun confirmed partial improvement but not full closure`
+- `rerun evidence:` `after rebuilding the plugin and setting recallTimeoutMs=15000, logs showed both successful injections like "injecting 1 memories into context (31ms/15000ms budget)" and remaining warnings "recall timed out after 15000ms ..."`
 
 ## Backlog Mapping
 

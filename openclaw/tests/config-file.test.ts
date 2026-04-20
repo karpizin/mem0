@@ -72,6 +72,7 @@ describe("readPluginAuth", () => {
               mode: "platform",
               autoRecall: true,
               autoCapture: false,
+              recallTimeoutMs: 12000,
               topK: 10,
             },
           },
@@ -87,6 +88,7 @@ describe("readPluginAuth", () => {
       mode: "platform",
       autoRecall: true,
       autoCapture: false,
+      recallTimeoutMs: 12000,
       topK: 10,
     });
   });
@@ -101,6 +103,7 @@ describe("readPluginAuth", () => {
               api_key: "sk-snake",
               base_url: "https://snake.api.com",
               user_id: "user-snake",
+              recall_timeout_ms: 9000,
             },
           },
         },
@@ -111,6 +114,7 @@ describe("readPluginAuth", () => {
     expect(auth.apiKey).toBe("sk-snake");
     expect(auth.baseUrl).toBe("https://snake.api.com");
     expect(auth.userId).toBe("user-snake");
+    expect(auth.recallTimeoutMs).toBe(9000);
   });
 
   it("returns empty object when JSON is invalid", () => {

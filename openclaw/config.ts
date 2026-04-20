@@ -153,6 +153,7 @@ const ALLOWED_KEYS = [
   "userEmail",
   "autoCapture",
   "autoRecall",
+  "recallTimeoutMs",
   "customInstructions",
   "customCategories",
   "customPrompt",
@@ -259,6 +260,8 @@ export const mem0ConfigSchema = {
             })(),
       autoCapture: cfg.autoCapture !== false,
       autoRecall: cfg.autoRecall !== false,
+      recallTimeoutMs:
+        typeof cfg.recallTimeoutMs === "number" ? cfg.recallTimeoutMs : 8000,
       customInstructions:
         typeof cfg.customInstructions === "string"
           ? cfg.customInstructions

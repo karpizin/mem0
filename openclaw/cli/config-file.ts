@@ -33,6 +33,7 @@ export interface PluginAuthConfig {
   mode?: string;
   autoRecall?: boolean;
   autoCapture?: boolean;
+  recallTimeoutMs?: number;
   topK?: number;
   anonymousTelemetryId?: string;
 }
@@ -78,6 +79,8 @@ export function readPluginAuth(): PluginAuthConfig {
     mode: cfg.mode as string | undefined,
     autoRecall: cfg.autoRecall as boolean | undefined,
     autoCapture: cfg.autoCapture as boolean | undefined,
+    recallTimeoutMs:
+      (cfg.recallTimeoutMs ?? cfg.recall_timeout_ms) as number | undefined,
     topK: cfg.topK as number | undefined,
     anonymousTelemetryId: cfg.anonymousTelemetryId as string | undefined,
   };

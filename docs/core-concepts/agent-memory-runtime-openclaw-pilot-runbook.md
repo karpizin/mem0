@@ -97,6 +97,7 @@ curl http://localhost:8080/v1/observability/stats
   "config": {
     "mode": "runtime",
     "userId": "pilot-user",
+    "recallTimeoutMs": 15000,
     "runtime": {
       "baseUrl": "http://localhost:8080",
       "agentName": "primary"
@@ -104,6 +105,11 @@ curl http://localhost:8080/v1/observability/stats
   }
 }
 ```
+
+Для live-пилотов рекомендованный baseline сейчас такой:
+
+- `recallTimeoutMs = 15000`
+- дальше подстраивать уже по логам `openclaw-mem0: injecting ... (Xms/Yms budget)` и `openclaw-mem0: recall timed out ...`
 
 ## Сценарии приемки
 

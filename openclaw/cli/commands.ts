@@ -949,6 +949,7 @@ export function registerCliCommands(
         user_id: "userId",
         auto_recall: "autoRecall",
         auto_capture: "autoCapture",
+        recall_timeout_ms: "recallTimeoutMs",
         top_k: "topK",
         mode: "mode",
         embedder_provider: "oss.embedder.provider",
@@ -979,7 +980,11 @@ export function registerCliCommands(
       ]);
 
       // Integer config fields — coerce to number on set
-      const INTEGER_KEYS = new Set(["topK", "oss.vectorStore.config.port"]);
+      const INTEGER_KEYS = new Set([
+        "recallTimeoutMs",
+        "topK",
+        "oss.vectorStore.config.port",
+      ]);
 
       /** Resolve a user-facing key to the internal camelCase field name. */
       function resolveConfigKey(key: string): string | null {
@@ -1006,6 +1011,7 @@ export function registerCliCommands(
           userEmail: auth.userEmail,
           autoRecall: cfg.autoRecall,
           autoCapture: cfg.autoCapture,
+          recallTimeoutMs: cfg.recallTimeoutMs,
           topK: cfg.topK,
         };
         return values[field];
@@ -1038,6 +1044,7 @@ export function registerCliCommands(
             ["user_id", "userId"],
             ["auto_recall", "autoRecall"],
             ["auto_capture", "autoCapture"],
+            ["recall_timeout_ms", "recallTimeoutMs"],
             ["top_k", "topK"],
           ];
 

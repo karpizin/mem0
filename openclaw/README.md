@@ -74,6 +74,7 @@ Use this mode when OpenClaw should talk to the standalone `memory-runtime` servi
   "config": {
     "mode": "runtime",
     "userId": "alice",
+    "recallTimeoutMs": 15000,
     "runtime": {
       "baseUrl": "http://localhost:8080",
       "apiKey": "${MEMORY_RUNTIME_API_KEY}",
@@ -167,6 +168,7 @@ openclaw mem0 dream --dry-run
 | `userId` | `string` | OS username | User identifier. All memories scoped to this value. |
 | `autoRecall` | `boolean` | `true` | Inject relevant memories before each turn |
 | `autoCapture` | `boolean` | `true` | Extract and store facts after each turn |
+| `recallTimeoutMs` | `number` | `8000` | Max pre-prompt auto-recall budget before the turn proceeds without injected memories |
 | `topK` | `number` | `5` | Max memories returned per recall |
 | `searchThreshold` | `number` | `0.5` | Minimum similarity score (0-1) |
 

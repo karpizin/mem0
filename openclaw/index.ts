@@ -188,7 +188,7 @@ const memoryPlugin = definePluginEntry({
     });
 
     api.logger.info(
-      `openclaw-mem0: registered (mode: ${cfg.mode}, user: ${cfg.userId}, autoRecall: ${cfg.autoRecall}, autoCapture: ${cfg.autoCapture}, skills: ${skillsActive})`,
+      `openclaw-mem0: registered (mode: ${cfg.mode}, user: ${cfg.userId}, autoRecall: ${cfg.autoRecall}, autoCapture: ${cfg.autoCapture}, recallTimeoutMs: ${cfg.recallTimeoutMs}, skills: ${skillsActive})`,
     );
 
     // Helper: build add options
@@ -301,7 +301,7 @@ const memoryPlugin = definePluginEntry({
       start: (...args: any[]) => {
         pluginStateDir = args[0]?.stateDir;
         api.logger.info(
-          `openclaw-mem0: initialized (mode: ${cfg.mode}, user: ${cfg.userId}, autoRecall: ${cfg.autoRecall}, autoCapture: ${cfg.autoCapture}, stateDir: ${pluginStateDir ?? "none"})`,
+          `openclaw-mem0: initialized (mode: ${cfg.mode}, user: ${cfg.userId}, autoRecall: ${cfg.autoRecall}, autoCapture: ${cfg.autoCapture}, recallTimeoutMs: ${cfg.recallTimeoutMs}, stateDir: ${pluginStateDir ?? "none"})`,
         );
       },
       stop: () => {
@@ -597,8 +597,6 @@ function registerHooks(
 
   // Auto-recall: inject relevant memories before prompt is built
   if (cfg.autoRecall) {
-    const RECALL_TIMEOUT_MS = 8_000;
-
     api.on("before_prompt_build", async (event: any, ctx: any) => {
       if (!event.prompt || event.prompt.length < 5) return;
 
@@ -648,6 +646,7 @@ function registerHooks(
         .trim();
 
       const recallStart = Date.now();
+      const recallTimeoutMs = cfg.recallTimeoutMs;
       const recallWork = async () => {
         // Single search with a reasonable candidate pool
         const recallTopK = Math.max((cfg.topK ?? 5) * 2, 10);
@@ -721,10 +720,13 @@ function registerHooks(
           strategy: "legacy",
           memory_count: longTermResults.length,
           latency_ms: Date.now() - recallStart,
+          timeout_ms: recallTimeoutMs,
+          timed_out: false,
+          session_kind: isSubagent ? "subagent" : "interactive",
         });
 
         api.logger.info(
-          `openclaw-mem0: injecting ${longTermResults.length} memories into context`,
+          `openclaw-mem0: injecting ${longTermResults.length} memories into context (${Date.now() - recallStart}ms/${recallTimeoutMs}ms budget)`,
         );
 
         const preamble = isSubagent
@@ -738,19 +740,38 @@ function registerHooks(
 
       try {
         const timeout = new Promise<undefined>((resolve) => {
-          setTimeout(() => resolve(undefined), RECALL_TIMEOUT_MS);
+          setTimeout(() => resolve(undefined), recallTimeoutMs);
         });
         const result = await Promise.race([
           recallWork(),
           timeout.then(() => {
+            const latencyMs = Date.now() - recallStart;
+            _captureEvent("openclaw.hook.recall", {
+              strategy: "legacy",
+              memory_count: 0,
+              latency_ms: latencyMs,
+              timeout_ms: recallTimeoutMs,
+              timed_out: true,
+              session_kind: isSubagent ? "subagent" : "interactive",
+            });
             api.logger.warn(
-              `openclaw-mem0: recall timed out after ${RECALL_TIMEOUT_MS}ms, skipping`,
+              `openclaw-mem0: recall timed out after ${recallTimeoutMs}ms (elapsed ${latencyMs}ms, session ${sessionId ?? "unknown"}), skipping`,
             );
             return undefined;
           }),
         ]);
         return result;
       } catch (err) {
+        const latencyMs = Date.now() - recallStart;
+        _captureEvent("openclaw.hook.recall", {
+          strategy: "legacy",
+          memory_count: 0,
+          latency_ms: latencyMs,
+          timeout_ms: recallTimeoutMs,
+          timed_out: false,
+          failed: true,
+          session_kind: isSubagent ? "subagent" : "interactive",
+        });
         api.logger.warn(`openclaw-mem0: recall failed: ${String(err)}`);
       }
     });

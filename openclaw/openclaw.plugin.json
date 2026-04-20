@@ -54,6 +54,11 @@
       "label": "Auto-Recall",
       "help": "Automatically inject relevant memories before each agent turn"
     },
+    "recallTimeoutMs": {
+      "label": "Recall Timeout (ms)",
+      "placeholder": "8000",
+      "help": "Maximum time budget for auto-recall before the turn proceeds without injected memories. Default: 8000ms"
+    },
     "customInstructions": {
       "label": "Custom Instructions",
       "placeholder": "Only store user preferences and important facts...",
@@ -121,6 +126,9 @@
       },
       "autoRecall": {
         "type": "boolean"
+      },
+      "recallTimeoutMs": {
+        "type": "number"
       },
       "customInstructions": {
         "type": "string"

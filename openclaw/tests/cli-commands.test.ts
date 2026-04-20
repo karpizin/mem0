@@ -1068,6 +1068,18 @@ describe("registerCliCommands", () => {
       );
     });
 
+    it("coerces recall timeout integer string for integer keys", () => {
+      const { mem0 } = setup();
+      const configCmd = findCommand(mem0, "config")!;
+      const setCmd = findCommand(configCmd, "set")!;
+
+      setCmd._action!("recall_timeout_ms", "12000");
+
+      expect(writePluginAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ recallTimeoutMs: 12000 }),
+      );
+    });
+
     it("errors on invalid integer value for integer keys", () => {
       const { mem0 } = setup();
       const configCmd = findCommand(mem0, "config")!;

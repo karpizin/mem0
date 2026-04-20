@@ -54,6 +54,11 @@ describe("mem0ConfigSchema.parse() — defaults", () => {
     expect(cfg.autoRecall).toBe(true);
   });
 
+  it("recallTimeoutMs defaults to 8000", () => {
+    const cfg = mem0ConfigSchema.parse({ apiKey: "test-key" });
+    expect(cfg.recallTimeoutMs).toBe(8000);
+  });
+
   it("topK defaults to 5", () => {
     const cfg = mem0ConfigSchema.parse({ apiKey: "test-key" });
     expect(cfg.topK).toBe(5);
@@ -99,9 +104,9 @@ describe("mem0ConfigSchema.parse() — defaults", () => {
 // mem0ConfigSchema.parse() — mode parsing
 // ---------------------------------------------------------------------------
 describe("mem0ConfigSchema.parse() — mode parsing", () => {
-  it('"oss" is not a valid mode and defaults to "platform"', () => {
+  it('"oss" is accepted as a legacy alias for "open-source"', () => {
     const cfg = mem0ConfigSchema.parse({ mode: "oss", apiKey: "k" });
-    expect(cfg.mode).toBe("platform");
+    expect(cfg.mode).toBe("open-source");
   });
 
   it('"open-source" stays as "open-source"', () => {
@@ -285,6 +290,14 @@ describe("mem0ConfigSchema.parse() — explicit overrides", () => {
       searchThreshold: 0.8,
     });
     expect(cfg.searchThreshold).toBe(0.8);
+  });
+
+  it("custom recallTimeoutMs is used when provided", () => {
+    const cfg = mem0ConfigSchema.parse({
+      apiKey: "k",
+      recallTimeoutMs: 12000,
+    });
+    expect(cfg.recallTimeoutMs).toBe(12000);
   });
 
   it("custom customInstructions override defaults", () => {

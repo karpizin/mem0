@@ -10,7 +10,7 @@
 
 | ID | Title | Priority | Layer | Source finding | Reproducible | Next action | Owner |
 |---|---|---|---|---|---|---|---|
-| `BL-001` | Make OpenClaw plugin recall timeout configurable and instrumented | `p1` | `Adapters / OpenClaw Contract` | `F-2026-04-21-001` | `yes` | Add config knob, latency logs, and rerun live pack | `integration` |
+| `BL-001` | Make OpenClaw plugin recall timeout configurable and instrumented | `p1` | `Adapters / OpenClaw Contract` | `F-2026-04-21-001` | `yes` | Implemented on 2026-04-21; rerun showed partial mitigation at 15000ms, so next step is trimming recall work and separating success-vs-timeout scenarios more clearly | `integration` |
 | `BL-002` | Improve live recall packing so durable architecture facts land in cleaner slots | `p2` | `Retrieval` | `pilot result notes` | `yes` | Tune slot assignment for infrastructure-oriented facts | `runtime` |
 | `BL-003` | Silence or formalize `plugins.allow` warning for trusted local plugin setup | `p3` | `Documentation / Runbooks` | `pilot logs` | `yes` | Document recommended allowlist config for live pilots | `docs` |
 

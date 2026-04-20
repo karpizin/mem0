@@ -30,6 +30,7 @@ export type Mem0Config = {
   userId: string;
   autoCapture: boolean;
   autoRecall: boolean;
+  recallTimeoutMs: number;
   searchThreshold: number;
   topK: number;
   // Setup state
