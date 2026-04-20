@@ -101,6 +101,14 @@ How it works in this mode:
 
 Both run silently. No prompting, no manual calls required.
 
+The plugin also skips low-value auto-recall turns on purpose:
+
+- non-interactive triggers and bootstrap/system prompts
+- short acknowledgement-style follow-ups
+- rapid repeated turns in the same session when there is no clear continuity signal
+
+If the prompt explicitly asks to remember prior context, previous decisions, architecture, config, or project history, recall still runs even under the cooldown policy.
+
 ### Memory Scopes
 
 - **Session (short-term)** — Scoped to the current conversation via `run_id`. Recalled alongside long-term memories.

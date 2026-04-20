@@ -42,6 +42,7 @@ import {
   isSkillsMode,
 } from "./skill-loader.ts";
 import { recall as skillRecall, sanitizeQuery } from "./recall.ts";
+import { shouldSkipLegacyRecall } from "./recall-policy.ts";
 import {
   incrementSessionCount,
   checkCheapGates,
@@ -82,6 +83,12 @@ export {
 export { mem0ConfigSchema } from "./config.ts";
 export type { FileConfig } from "./config.ts";
 export { createProvider } from "./providers.ts";
+export {
+  stripRecallPolicyNoise,
+  hasContinuityMarkers,
+  isAcknowledgementLikePrompt,
+  shouldSkipLegacyRecall,
+} from "./recall-policy.ts";
 
 // ============================================================================
 // Helpers
@@ -594,6 +601,7 @@ function registerHooks(
 
   // Track last seen session ID to detect actual new sessions (not every turn)
   let lastRecallSessionId: string | undefined;
+  const lastRecallAttemptedAtBySession = new Map<string, number>();
 
   // Auto-recall: inject relevant memories before prompt is built
   if (cfg.autoRecall) {
@@ -637,16 +645,34 @@ function registerHooks(
       const isSubagent = isSubagentSession(sessionId);
       const recallSessionKey = isSubagent ? undefined : sessionId;
 
-      // Strip OpenClaw sender metadata from the prompt before searching
-      const cleanPrompt = event.prompt
-        .replace(
-          /Sender\s*\(untrusted metadata\):\s*```json[\s\S]*?```\s*/gi,
-          "",
-        )
-        .trim();
+      const skipDecision = shouldSkipLegacyRecall({
+        prompt: event.prompt,
+        isNewSession,
+        sessionId,
+        lastRecallAtMs: sessionId
+          ? lastRecallAttemptedAtBySession.get(sessionId)
+          : undefined,
+      });
+      const cleanPrompt = skipDecision.cleanPrompt;
+
+      if (skipDecision.skip) {
+        _captureEvent("openclaw.hook.recall_skipped", {
+          strategy: "legacy",
+          skip_reason: skipDecision.reason,
+          session_kind: isSubagent ? "subagent" : "interactive",
+          is_new_session: isNewSession,
+        });
+        api.logger.info(
+          `openclaw-mem0: skipping recall for ${skipDecision.reason}`,
+        );
+        return;
+      }
 
       const recallStart = Date.now();
       const recallTimeoutMs = cfg.recallTimeoutMs;
+      if (sessionId) {
+        lastRecallAttemptedAtBySession.set(sessionId, recallStart);
+      }
       const recallWork = async () => {
         // Single search with a reasonable candidate pool
         const recallTopK = Math.max((cfg.topK ?? 5) * 2, 10);

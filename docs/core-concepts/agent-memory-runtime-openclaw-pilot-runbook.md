@@ -111,6 +111,12 @@ curl http://localhost:8080/v1/observability/stats
 - `recallTimeoutMs = 15000`
 - дальше подстраивать уже по логам `openclaw-mem0: injecting ... (Xms/Yms budget)` и `openclaw-mem0: recall timed out ...`
 
+Важно:
+
+- plugin теперь может намеренно пропускать auto-recall на low-value turns
+- это нормально для коротких acknowledgement/follow-up turns и для частых повторных turns внутри одной session
+- если нужен recall именно на таком turn, prompt должен содержать continuity-сигнал вроде `remember`, `earlier`, `what did we decide`, `напомни`, `в прошлый раз`, `мы решили`
+
 ## Сценарии приемки
 
 Подробный набор сценариев и ожидаемых исходов вынесен в отдельный документ:
