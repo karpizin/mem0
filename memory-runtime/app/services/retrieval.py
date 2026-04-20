@@ -250,6 +250,24 @@ class RetrievalService:
             if len(selected) >= max_items:
                 break
 
+        if selected and len(selected) < max_items and not explicit_session_intent:
+            selected_ids = {candidate.episode_id for candidate in selected}
+            for candidate in ranked_candidates:
+                if candidate.episode_id in selected_ids:
+                    continue
+                slot = cls._slot_for_candidate(candidate)
+                if slot != "active_project_context" or slot_counts[slot] >= MAX_ITEMS_BY_SLOT[slot]:
+                    continue
+                score, _recency = cls._score_candidate(query, candidate, active_session_id)
+                if score < 1.0:
+                    continue
+                candidate_tokens = cls._normalize_tokens(f"{candidate.summary} {candidate.raw_text}")
+                if candidate_tokens & SCRATCH_TOKENS:
+                    continue
+                selected.append(candidate)
+                slot_counts[slot] += 1
+                break
+
         if selected:
             return selected
         return ranked_candidates[: min(2, len(ranked_candidates))]

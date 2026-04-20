@@ -152,4 +152,60 @@ describe("MemoryRuntimeProvider", () => {
 
     await expect(provider.delete("rt:ns-2:episode:ep-2")).resolves.toBeUndefined();
   });
+
+  it("implements deleteAll and returns empty history while update is explicit", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/adapters/openclaw/bootstrap")) {
+        return new Response(
+          JSON.stringify({
+            adapter: "openclaw",
+            source_system: "openclaw",
+            namespace_id: "ns-3",
+            namespace_name: "alice",
+            agent_id: "agent-3",
+            agent_name: "primary",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      if (url.includes("/v1/adapters/openclaw/memories?")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              { id: "ep-10", memory: "m1", resource_kind: "episode", space_type: "project-space" },
+              { id: "ep-11", memory: "m2", resource_kind: "episode", space_type: "project-space" },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      if (url.includes("/v1/adapters/openclaw/memories/ep-10") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+
+      if (url.includes("/v1/adapters/openclaw/memories/ep-11") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createProvider(
+      mem0ConfigSchema.parse({
+        mode: "runtime",
+        runtime: { baseUrl: "http://runtime.test" },
+      }),
+      { resolvePath: (p: string) => p } as any,
+    );
+
+    await expect(provider.history("rt:ns-3:episode:ep-10")).resolves.toEqual([]);
+    await expect(provider.update("rt:ns-3:episode:ep-10", "updated")).rejects.toThrow(
+      "does not support in-place update",
+    );
+    await expect(provider.deleteAll("alice")).resolves.toBeUndefined();
+  });
 });

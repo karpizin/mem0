@@ -27,6 +27,8 @@ The recommended path is a clean worktree, because it preserves safety and makes 
 
 ### Layer 1: Core Runtime and Core Documentation
 
+Status: completed on `codex/upstream-sync-integration`
+
 Transfer first:
 
 - `ad5bd379` Add agent memory runtime phase A scaffold
@@ -50,6 +52,8 @@ Why first:
 Expected conflict level: low to medium
 
 ### Layer 2: OpenClaw Integration and Pilot Hardening
+
+Status: completed on `codex/upstream-sync-integration`
 
 Transfer second:
 
@@ -97,7 +101,16 @@ Why second:
 
 Expected conflict level: medium to high
 
+Validation completed:
+
+- `memory-runtime`: `101 passed`
+- `memory-runtime`: `ruff check .`
+- `openclaw`: `vitest runtime-provider.test.ts`
+- `openclaw`: `tsc --noEmit`
+
 ### Layer 3: MCP Facade
+
+Status: next
 
 Transfer third:
 
@@ -116,6 +129,8 @@ Expected conflict level: low to medium
 
 ### Layer 4: Local LLM Hardening
 
+Status: pending manual reconcile
+
 Transfer fourth, manually:
 
 - `76f3aef6` Add local model compatibility guide
@@ -130,6 +145,8 @@ Why manual handling is required:
 Expected conflict level: high
 
 ### Layer 5: Presentations and Analytics
+
+Status: pending
 
 Transfer last:
 

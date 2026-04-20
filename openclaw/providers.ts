@@ -604,6 +604,33 @@ class MemoryRuntimeProvider implements Mem0Provider {
     );
   }
 
+  async update(memoryId: string, _text: string): Promise<void> {
+    throw new Error(
+      `memory-runtime provider does not support in-place update for ${memoryId} yet`,
+    );
+  }
+
+  async deleteAll(userId: string): Promise<void> {
+    const items = await this.getAll({ user_id: userId });
+    for (const item of items) {
+      await this.delete(item.id);
+    }
+  }
+
+  async history(
+    _memoryId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      old_memory: string;
+      new_memory: string;
+      event: string;
+      created_at: string;
+    }>
+  > {
+    return [];
+  }
+
   private async ensureScope(userId: string): Promise<RuntimeScope> {
     const existing = this.scopeCache.get(userId);
     if (existing) return existing;
