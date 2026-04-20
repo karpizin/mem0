@@ -109,6 +109,14 @@ The plugin also skips low-value auto-recall turns on purpose:
 
 If the prompt explicitly asks to remember prior context, previous decisions, architecture, config, or project history, recall still runs even under the cooldown policy.
 
+Legacy auto-recall now also uses a compact injection format:
+
+- existing-session turns inject only a small top slice of the retrieved memories
+- new-session turns get a slightly wider slice for cold-start continuity
+- injected memory lines are clipped into a compact form before they are appended to the prompt
+
+This keeps recall useful while lowering the memory-side prompt cost in heavy live scenarios.
+
 ### Memory Scopes
 
 - **Session (short-term)** — Scoped to the current conversation via `run_id`. Recalled alongside long-term memories.

@@ -43,6 +43,7 @@ import {
 } from "./skill-loader.ts";
 import { recall as skillRecall, sanitizeQuery } from "./recall.ts";
 import { shouldSkipLegacyRecall } from "./recall-policy.ts";
+import { buildLegacyRecallContext } from "./legacy-recall.ts";
 import {
   incrementSessionCount,
   checkCheapGates,
@@ -734,17 +735,21 @@ function registerHooks(
 
         if (longTermResults.length === 0) return undefined;
 
-        // Build context with clear labels
-        const memoryContext = longTermResults
-          .map(
-            (r) =>
-              `- ${r.memory}${r.categories?.length ? ` [${r.categories.join(", ")}]` : ""}`,
-          )
-          .join("\n");
+        const compactContext = buildLegacyRecallContext({
+          memories: longTermResults,
+          userId: cfg.userId,
+          isSubagent,
+          isNewSession,
+          topK: cfg.topK,
+        });
+
+        if (!compactContext) return undefined;
 
         _captureEvent("openclaw.hook.recall", {
           strategy: "legacy",
-          memory_count: longTermResults.length,
+          memory_count: compactContext.memoryCount,
+          candidate_count: longTermResults.length,
+          context_chars: compactContext.contextChars,
           latency_ms: Date.now() - recallStart,
           timeout_ms: recallTimeoutMs,
           timed_out: false,
@@ -752,15 +757,11 @@ function registerHooks(
         });
 
         api.logger.info(
-          `openclaw-mem0: injecting ${longTermResults.length} memories into context (${Date.now() - recallStart}ms/${recallTimeoutMs}ms budget)`,
+          `openclaw-mem0: injecting ${compactContext.memoryCount}/${longTermResults.length} memories into context (${Date.now() - recallStart}ms/${recallTimeoutMs}ms budget, ${compactContext.contextChars} chars)`,
         );
 
-        const preamble = isSubagent
-          ? `The following are stored memories for user "${cfg.userId}". You are a subagent — use these memories for context but do not assume you are this user.`
-          : `The following are stored memories for user "${cfg.userId}". Use them to personalize your response:`;
-
         return {
-          prependContext: `<relevant-memories>\n${preamble}\n${memoryContext}\n</relevant-memories>`,
+          prependContext: compactContext.context,
         };
       };
 

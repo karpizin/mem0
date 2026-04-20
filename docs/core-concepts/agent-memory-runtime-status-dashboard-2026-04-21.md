@@ -55,6 +55,11 @@ Current overall state: `MVP live-ready with important yellow zones`
 
 Continue reducing the heavy `OpenClaw` plugin recall path, not just increasing timeout.
 
+Latest step:
+
+- legacy recall injection was compacted so fewer, shorter memory lines reach the heavy live prompt path
+- a live sanity turn now shows `injecting 2/4 memories ... 319 chars` and can complete in ~13.9s, which suggests the memory-side prompt contribution is moving in the right direction
+
 ### `BL-004`
 
 Address `OpenClaw embedded agent/provider timeout`:

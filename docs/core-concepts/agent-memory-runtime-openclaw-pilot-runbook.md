@@ -118,6 +118,8 @@ curl http://localhost:8080/v1/observability/stats
 - `continuity-timeout-seconds = 240`
 - `thinking = off`
 - `continuity-thinking = off`
+- compact legacy recall injection now reduces the number and length of memory lines appended to the prompt, so reruns after this change should be compared against older logs for both `recall timed out` frequency and overall prompt weight
+- a post-change sanity turn already showed `injecting 2/4 memories ... 319 chars` with a successful response in ~13.9s, which is a useful directional win even though the broader timeout problem is not fully closed yet
 
 Важно:
 
