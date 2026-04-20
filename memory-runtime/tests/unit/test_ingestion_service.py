@@ -23,6 +23,26 @@ class IngestionServiceTests(unittest.TestCase):
             ],
         )
 
+    def test_normalize_messages_drops_system_messages_when_turn_is_mixed(self) -> None:
+        messages = [
+            EventMessage(
+                role="system",
+                content="Current date: 2026-04-20. Extract durable facts from this conversation.",
+            ),
+            EventMessage(role="user", content="  Keep Postgres and Redis in the pilot stack. "),
+            EventMessage(role="assistant", content=" Noted. "),
+        ]
+
+        normalized = IngestionService.normalize_messages(messages)
+
+        self.assertEqual(
+            [message.model_dump() for message in normalized],
+            [
+                {"role": "user", "content": "Keep Postgres and Redis in the pilot stack."},
+                {"role": "assistant", "content": "Noted."},
+            ],
+        )
+
     def test_compute_dedupe_key_is_deterministic(self) -> None:
         payload = {
             "messages": [{"role": "user", "content": "Continue the plan"}],

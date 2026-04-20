@@ -1176,6 +1176,7 @@ Definition of Done:
   - inferred memory scope
 - project/shared transient notes now demote to `session_only` instead of polluting long-term memory
 - low-trust poisoning patterns now flow through the same explicit decision layer instead of a separate implicit branch
+- mixed OpenClaw capture turns now drop `system` messages on ingestion when `user`/`assistant` content is present, so system/bootstrap prompt text no longer gets promoted as a durable fact
 - structured JSON logs now cover:
   - ingestion
   - promotion decision outcomes

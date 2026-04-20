@@ -206,6 +206,7 @@ make reset-pilot
 
 `make preflight` прогоняет единый runtime preflight check и сохраняет JSON report в `.artifacts/openclaw_preflight_report.json`.
 Localhost-facing pilot/eval tooling теперь использует HTTP clients с `trust_env=False`, чтобы системные proxy env vars не ломали сценарии на `127.0.0.1`.
+Mixed `conversation_turn` payloads, в которых `OpenClaw` присылает `system + user + assistant`, теперь санируются на ingestion: `system`-сообщения отбрасываются, если в turn есть пользовательский или агентный контент. Это не дает system/bootstrap prompt попасть в durable memory как обычный факт.
 `make pilot-smoke` поднимает Docker stack, прогоняет synthetic OpenClaw pilot contour и сохраняет JSON report в `.artifacts/openclaw_pilot_smoke_report.json`.
 `make pilot-smoke` дополнительно сохраняет raw trace bundle в `.artifacts/pilot_traces/pilot-smoke/<run-name>/`.
 `make pilot-scenarios` прогоняет 5 наиболее важных OpenClaw pilot scenarios и сохраняет JSON report в `.artifacts/openclaw_pilot_scenarios_report.json`.

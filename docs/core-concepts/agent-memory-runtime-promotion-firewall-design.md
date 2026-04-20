@@ -110,6 +110,7 @@ Expected behavior:
 
 - dangerous self-amplifying sources stop entering durable memory
 - useful user/agent/tool content still follows the normal pipeline
+- mixed `system + user + assistant` capture payloads no longer let the `system` portion dominate summary/consolidation when non-system content is present
 
 This is the step being implemented now.
 

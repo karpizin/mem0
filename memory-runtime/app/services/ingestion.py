@@ -169,6 +169,9 @@ class IngestionService:
         for message in messages:
             content = " ".join(message.content.split())
             normalized.append(EventMessage(role=message.role, content=content))
+        non_system = [message for message in normalized if message.role != "system"]
+        if non_system:
+            normalized = non_system
         if not normalized:
             raise ValueError("At least one valid message is required")
         return normalized

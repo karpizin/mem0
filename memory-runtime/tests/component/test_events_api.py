@@ -143,3 +143,43 @@ class EventsApiTests(unittest.TestCase):
         self.assertEqual(events_count, 1)
         self.assertEqual(episodes_count, 1)
         self.assertEqual(jobs_count, 1)
+
+    def test_event_ingestion_drops_system_messages_from_mixed_conversation_turns(self) -> None:
+        response = self.client.post(
+            "/v1/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_mixed_system",
+                "source_system": "openclaw",
+                "event_type": "conversation_turn",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Current date: 2026-04-20. Extract durable facts from this conversation.",
+                    },
+                    {"role": "user", "content": "Keep Postgres and Redis in the pilot stack."},
+                    {"role": "assistant", "content": "Noted."},
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(
+            payload["payload_json"]["messages"],
+            [
+                {"role": "user", "content": "Keep Postgres and Redis in the pilot stack."},
+                {"role": "assistant", "content": "Noted."},
+            ],
+        )
+
+        with get_engine().connect() as connection:
+            summary = connection.execute(text("SELECT summary FROM episodes LIMIT 1")).scalar_one()
+            raw_text = connection.execute(text("SELECT raw_text FROM episodes LIMIT 1")).scalar_one()
+
+        self.assertEqual(summary, "conversation_turn: Keep Postgres and Redis in the pilot stack.")
+        self.assertEqual(
+            raw_text,
+            "user: Keep Postgres and Redis in the pilot stack.\nassistant: Noted.",
+        )
