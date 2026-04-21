@@ -271,3 +271,66 @@ The most promising next optimization now is:
 
 - reduce `candidate_fetch` pressure in `EpisodeRepository.list_for_recall()`
 - then reassess whether we still need deeper Python-side reductions in candidate construction and selection
+
+## Candidate Fetch Optimization Follow-Up
+
+The next optimization pass changed `EpisodeRepository.list_for_recall()` so it no longer materializes full ORM `Episode` objects for recall gathering.
+
+Instead, the recall path now fetches only the columns it actually needs and returns lightweight row-shaped records for:
+
+- `id`
+- `summary`
+- `raw_text`
+- `importance_hint`
+- `created_at`
+- `session_id`
+- `space_type`
+
+This reduces Python-side ORM construction overhead during the heaviest concurrent phase while keeping the retrieval contract unchanged.
+
+### Before / After
+
+| Memories | Metric | Before | After | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `500` | `avg latency` | `808.45ms` | `612.5ms` | `-195.95ms` |
+| `500` | `p95 latency` | `990ms` | `658ms` | `-332ms` |
+| `500` | `throughput` | `9.6071 rps` | `12.4866 rps` | `+2.8795 rps` |
+| `1000` | `avg latency` | `1588.65ms` | `1187.025ms` | `-401.625ms` |
+| `1000` | `p95 latency` | `1662ms` | `1248ms` | `-414ms` |
+| `1000` | `throughput` | `4.9553 rps` | `6.4723 rps` | `+1.517 rps` |
+
+### Updated Phase Breakdown
+
+| Memories | Avg latency | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `612.5ms` | `302.5ms` | `60.375ms` | `45.55ms` | `36.425ms` | `63.275ms` | `8.925ms` |
+| `1000` | `1187.025ms` | `617.25ms` | `148.5ms` | `54.425ms` | `93.8ms` | `155.875ms` | `11.875ms` |
+
+### Updated Share Of Internal Recall Work
+
+| Memories | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `58.5%` | `11.68%` | `8.81%` | `7.04%` | `12.24%` | `1.73%` |
+| `1000` | `57.06%` | `13.73%` | `5.03%` | `8.67%` | `14.41%` | `1.1%` |
+
+### Interpretation
+
+- this is the largest concurrent recall improvement so far after the original hot-path cleanup
+- `candidate_fetch` is still the largest slice, but it is no longer consuming roughly two-thirds of internal recall time
+- the gain holds at both `500` and `1000` memories, which strongly suggests ORM materialization overhead was a real part of the bottleneck
+- throughput improved by about `30%` at both pool sizes without changing recall output compactness or failure rate
+- the next likely frontier is now lower-level query/session contention or further narrowing of fetched candidate sets, rather than generic Python ranking work
+
+### Updated Production-Oriented Takeaway
+
+The concurrent recall story now looks like this:
+
+- `500 memories`, `8-way concurrency` is now in a much healthier range at about `612ms avg`, `658ms p95`
+- `1000 memories`, `8-way concurrency` is still meaningfully heavier, but it improved to about `1187ms avg`, `1248ms p95`
+- recall remains stable with `0` failures
+- output compactness remains stable, so the win came from runtime efficiency rather than more aggressive truncation
+
+The next performance step should now focus on:
+
+- reducing true DB/session contention under parallel recall
+- and only then deciding whether `candidate_build` or `selection` need another optimization pass

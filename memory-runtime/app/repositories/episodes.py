@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.models.episode import Episode
 from app.models.memory_space import MemorySpace
+
+
+@dataclass(slots=True, frozen=True)
+class RecallEpisodeRow:
+    id: str
+    summary: str
+    raw_text: str
+    importance_hint: str
+    created_at: datetime
+    session_id: str | None
 
 
 class EpisodeRepository:
@@ -48,9 +61,17 @@ class EpisodeRepository:
         agent_id: str | None,
         session_id: str | None,
         space_types: list[str],
-    ) -> list[tuple[Episode, str]]:
-        stmt: Select[tuple[Episode, str]] = (
-            select(Episode, MemorySpace.space_type)
+    ) -> list[tuple[RecallEpisodeRow, str]]:
+        stmt: Select[tuple[str, str, str, str, datetime, str | None, str]] = (
+            select(
+                Episode.id,
+                Episode.summary,
+                Episode.raw_text,
+                Episode.importance_hint,
+                Episode.created_at,
+                Episode.session_id,
+                MemorySpace.space_type,
+            )
             .join(MemorySpace, Episode.space_id == MemorySpace.id)
             .where(Episode.namespace_id == namespace_id)
             .where(MemorySpace.space_type.in_(space_types))
@@ -68,7 +89,20 @@ class EpisodeRepository:
         else:
             stmt = stmt.order_by(Episode.created_at.desc())
 
-        return list(self.session.execute(stmt).all())
+        return [
+            (
+                RecallEpisodeRow(
+                    id=episode_id,
+                    summary=summary,
+                    raw_text=raw_text,
+                    importance_hint=importance_hint,
+                    created_at=created_at,
+                    session_id=row_session_id,
+                ),
+                space_type,
+            )
+            for episode_id, summary, raw_text, importance_hint, created_at, row_session_id, space_type in self.session.execute(stmt).all()
+        ]
 
     def list_by_session(
         self,

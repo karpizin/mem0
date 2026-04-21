@@ -729,6 +729,13 @@ Definition of Done:
 - recall phase telemetry теперь показывает, что под `8-way` concurrent load основной bottleneck уже не ranking, а `candidate_fetch`:
   - около `66%` внутреннего recall времени и на `500`, и на `1000` memories
   - это делает `episodes.list_for_recall()` и DB/session contention следующим главным optimization frontier
+- после row-based `candidate_fetch` optimization в `episodes.list_for_recall()` concurrent baselines улучшились еще заметнее:
+  - `500 memories` / `8-way concurrency` -> `avg ~613ms`, `p95 ~658ms`, `~12.49 rps`
+  - `1000 memories` / `8-way concurrency` -> `avg ~1187ms`, `p95 ~1248ms`, `~6.47 rps`
+- фазовый breakdown после этого шага показывает, что `candidate_fetch` все еще главный bottleneck, но уже не доминирует так резко:
+  - около `58.5%` внутреннего recall времени на `500` memories
+  - около `57.1%` внутреннего recall времени на `1000` memories
+  - это подтверждает, что ORM materialization overhead был реальной частью pressure path
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 
