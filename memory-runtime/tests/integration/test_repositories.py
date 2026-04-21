@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -115,3 +116,68 @@ class RepositoryTests(unittest.TestCase):
         self.assertIsNotNone(event.id)
         self.assertIsNotNone(episode.id)
         self.assertEqual(episode.start_event_id, event.id)
+
+    def test_list_for_recall_prefers_query_relevant_older_rows_with_fetch_cap(self) -> None:
+        namespaces = NamespaceRepository(self.session)
+        agents = AgentRepository(self.session)
+        spaces = MemorySpaceRepository(self.session)
+        episodes = EpisodeRepository(self.session)
+
+        namespace = namespaces.create(
+            name="openclaw:agent:planner:recall-cap",
+            mode="isolated",
+            source_systems=["openclaw"],
+        )
+        agent = agents.create(namespace_id=namespace.id, name="planner", source_system="openclaw")
+        project_space = spaces.create(
+            namespace_id=namespace.id,
+            agent_id=agent.id,
+            space_type="project-space",
+            name="Project Space",
+        )
+
+        baseline = datetime.now(timezone.utc)
+        relevant = episodes.create(
+            namespace_id=namespace.id,
+            agent_id=agent.id,
+            space_id=project_space.id,
+            session_id="run_relevant",
+            start_event_id="event-relevant",
+            end_event_id="event-relevant",
+            summary="architecture_decision: Keep Postgres and Redis as the runtime baseline.",
+            raw_text="assistant: Keep Postgres and Redis as the runtime baseline for the memory service.",
+            token_count=12,
+            importance_hint="high",
+        )
+        relevant.created_at = baseline
+
+        for index in range(300):
+            noise_time = baseline + timedelta(seconds=index + 1)
+            noise = Episode(
+                namespace_id=namespace.id,
+                agent_id=agent.id,
+                space_id=project_space.id,
+                session_id=f"run_noise_{index}",
+                start_event_id=f"event-noise-{index}",
+                end_event_id=f"event-noise-{index}",
+                summary=f"conversation_turn: Bakery chatter {index} about errands and temporary scratch ideas.",
+                raw_text=f"assistant: Bakery chatter {index} about errands and temporary scratch ideas.",
+                token_count=12,
+                importance_hint="normal",
+                created_at=noise_time,
+            )
+            self.session.add(noise)
+
+        self.session.commit()
+
+        rows = episodes.list_for_recall(
+            namespace_id=namespace.id,
+            agent_id=agent.id,
+            session_id=None,
+            space_types=["project-space"],
+            query_tokens=["runtime", "baseline", "postgres", "redis"],
+        )
+
+        summaries = [episode.summary for episode, _space_type in rows]
+        self.assertLessEqual(len(rows), 256)
+        self.assertIn("architecture_decision: Keep Postgres and Redis as the runtime baseline.", summaries)

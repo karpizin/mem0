@@ -134,11 +134,13 @@ class RetrievalService:
             query=payload.query,
         )
         phase_started_at = monotonic_timer()
+        query_tokens = self._normalize_tokens(payload.query)
         rows = self.episodes.list_for_recall(
             namespace_id=payload.namespace_id,
             agent_id=payload.agent_id,
             session_id=payload.session_id,
             space_types=space_filters,
+            query_tokens=query_tokens,
         )
         phase_latencies_ms["candidate_fetch"] = elapsed_milliseconds(phase_started_at)
 

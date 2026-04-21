@@ -334,3 +334,69 @@ The next performance step should now focus on:
 
 - reducing true DB/session contention under parallel recall
 - and only then deciding whether `candidate_build` or `selection` need another optimization pass
+
+## Query-Aware Candidate Fetch Follow-Up
+
+After the row-based fetch improvement, the next optimization pass made `candidate_fetch` more selective instead of only making it cheaper:
+
+- recall now computes query tokens before calling `EpisodeRepository.list_for_recall()`
+- the repository orders candidates by:
+  - active-session affinity
+  - SQL-side query token overlap against `summary` and `raw_text`
+  - recency
+- the repository now returns only the top `256` recall candidates for the Python ranking path
+
+This is intentionally a conservative oversampled cap:
+
+- large enough to preserve the existing high-density recall tests
+- small enough to avoid dragging the full namespace into Python for every concurrent recall
+
+An integration regression was also added to prove that an older but query-relevant durable memory still survives the capped fetch path even when surrounded by `300+` newer noise rows.
+
+### Before / After
+
+These numbers compare the post-row-fetch baseline against the new query-aware capped fetch path.
+
+| Memories | Metric | Before | After | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `500` | `avg latency` | `612.5ms` | `229.225ms` | `-383.275ms` |
+| `500` | `p95 latency` | `658ms` | `275ms` | `-383ms` |
+| `500` | `throughput` | `12.4866 rps` | `31.6507 rps` | `+19.1641 rps` |
+| `1000` | `avg latency` | `1187.025ms` | `296.225ms` | `-890.8ms` |
+| `1000` | `p95 latency` | `1248ms` | `320ms` | `-928ms` |
+| `1000` | `throughput` | `6.4723 rps` | `25.1936 rps` | `+18.7213 rps` |
+
+### Updated Phase Breakdown
+
+| Memories | Avg latency | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `229.225ms` | `67.375ms` | `22.225ms` | `53.225ms` | `5.425ms` | `21.25ms` | `9.575ms` |
+| `1000` | `296.225ms` | `134.6ms` | `23.525ms` | `40.975ms` | `4.125ms` | `21.25ms` | `7.85ms` |
+
+### Updated Share Of Internal Recall Work
+
+| Memories | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `37.62%` | `12.41%` | `29.72%` | `3.03%` | `11.87%` | `5.35%` |
+| `1000` | `57.94%` | `10.13%` | `17.64%` | `1.78%` | `9.15%` | `3.38%` |
+
+### Interpretation
+
+- this is the biggest concurrent recall win in the current performance track
+- the improvement is especially large at `1000` memories, where the capped query-aware fetch avoids materializing a massive low-value tail
+- recall remains stable with `0` failures and high-density recall tests still pass
+- `candidate_fetch` is still the largest slice, especially at `1000`, but it is now operating on a much smaller and more relevant frontier
+- with this change, the next likely bottleneck is no longer raw fetch volume alone, but the combination of:
+  - fetch query cost itself
+  - feedback lookup
+  - residual DB/session contention under concurrency
+
+### Updated Production-Oriented Takeaway
+
+The concurrent recall story now looks much healthier:
+
+- `500 memories`, `8-way concurrency` is now about `229ms avg`, `275ms p95`
+- `1000 memories`, `8-way concurrency` is now about `296ms avg`, `320ms p95`
+- throughput improved into a much more usable range while keeping the recall output compact and stable
+
+This does not mean the performance track is done, but it does move the runtime from “concurrent recall is the obvious weak spot” to “concurrent recall is now strong enough that deeper tuning can be more selective and production-oriented.”

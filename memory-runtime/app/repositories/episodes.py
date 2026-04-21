@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, case, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.episode import Episode
@@ -18,6 +18,9 @@ class RecallEpisodeRow:
     importance_hint: str
     created_at: datetime
     session_id: str | None
+
+
+RECALL_FETCH_LIMIT = 256
 
 
 class EpisodeRepository:
@@ -61,6 +64,8 @@ class EpisodeRepository:
         agent_id: str | None,
         session_id: str | None,
         space_types: list[str],
+        query_tokens: list[str] | None = None,
+        limit: int = RECALL_FETCH_LIMIT,
     ) -> list[tuple[RecallEpisodeRow, str]]:
         stmt: Select[tuple[str, str, str, str, datetime, str | None, str]] = (
             select(
@@ -84,10 +89,18 @@ class EpisodeRepository:
                 | (MemorySpace.space_type == "shared-space")
             )
 
+        overlap_score = self._query_overlap_expression(query_tokens or [])
+
         if session_id is not None:
-            stmt = stmt.order_by((Episode.session_id == session_id).desc(), Episode.created_at.desc())
+            stmt = stmt.order_by(
+                (Episode.session_id == session_id).desc(),
+                overlap_score.desc(),
+                Episode.created_at.desc(),
+            )
         else:
-            stmt = stmt.order_by(Episode.created_at.desc())
+            stmt = stmt.order_by(overlap_score.desc(), Episode.created_at.desc())
+
+        stmt = stmt.limit(limit)
 
         return [
             (
@@ -103,6 +116,24 @@ class EpisodeRepository:
             )
             for episode_id, summary, raw_text, importance_hint, created_at, row_session_id, space_type in self.session.execute(stmt).all()
         ]
+
+    @staticmethod
+    def _query_overlap_expression(query_tokens: list[str]):
+        normalized_tokens = sorted({token.lower() for token in query_tokens if len(token) >= 4})[:8]
+        overlap_score = literal(0)
+        for token in normalized_tokens:
+            pattern = f"%{token}%"
+            overlap_score = overlap_score + case(
+                (
+                    or_(
+                        Episode.summary.ilike(pattern),
+                        Episode.raw_text.ilike(pattern),
+                    ),
+                    1,
+                ),
+                else_=0,
+            )
+        return overlap_score
 
     def list_by_session(
         self,

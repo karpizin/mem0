@@ -736,6 +736,17 @@ Definition of Done:
   - около `58.5%` внутреннего recall времени на `500` memories
   - около `57.1%` внутреннего recall времени на `1000` memories
   - это подтверждает, что ORM materialization overhead был реальной частью pressure path
+- после query-aware capped fetch в `episodes.list_for_recall()` concurrent baselines улучшились еще на порядок сильнее:
+  - `500 memories` / `8-way concurrency` -> `avg ~229ms`, `p95 ~275ms`, `~31.65 rps`
+  - `1000 memories` / `8-way concurrency` -> `avg ~296ms`, `p95 ~320ms`, `~25.19 rps`
+- recall path теперь:
+  - упорядочивает candidates по active-session affinity + SQL-side query token overlap + recency
+  - отдает в Python ranking только top `256` oversampled candidates
+- отдельный integration regression подтверждает, что older-but-relevant durable memory не теряется даже при `300+` новых шумных rows
+- после этого шага `candidate_fetch` все еще остается самой крупной фазой, но performance frontier уже заметно сместился:
+  - на `500` memories `candidate_fetch` около `37.6%` внутреннего recall времени
+  - на `1000` memories `candidate_fetch` около `57.9%`
+  - это делает следующими вероятными optimization targets уже не общий row volume, а feedback lookup и deeper DB/session contention under concurrency
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 
