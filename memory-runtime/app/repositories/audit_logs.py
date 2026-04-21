@@ -43,6 +43,8 @@ class AuditLogRepository:
     ) -> dict[str, float]:
         if not entity_ids:
             return {}
+        if not self.has_feedback_for_entity_type(namespace_id=namespace_id, entity_type=entity_type):
+            return {}
 
         stmt = (
             select(
@@ -65,6 +67,21 @@ class AuditLogRepository:
             entity_id: float(score or 0)
             for entity_id, score in self.session.execute(stmt).all()
         }
+
+    def has_feedback_for_entity_type(
+        self,
+        *,
+        namespace_id: str,
+        entity_type: str,
+    ) -> bool:
+        stmt = (
+            select(AuditLog.id)
+            .where(AuditLog.namespace_id == namespace_id)
+            .where(AuditLog.entity_type == entity_type)
+            .where(AuditLog.action.in_(("recall_feedback_positive", "recall_feedback_negative")))
+            .limit(1)
+        )
+        return self.session.execute(stmt).scalar_one_or_none() is not None
 
     def count_by_action(self, actions: list[str]) -> dict[str, int]:
         if not actions:

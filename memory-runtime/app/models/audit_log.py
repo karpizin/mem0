@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,6 +16,10 @@ def _utcnow() -> datetime:
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
+    __table_args__ = (
+        Index("ix_audit_log_namespace_entity_action", "namespace_id", "entity_type", "action", "entity_id"),
+        Index("ix_audit_log_namespace_action_created_at", "namespace_id", "action", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     namespace_id: Mapped[str] = mapped_column(String(36), ForeignKey("namespaces.id"), index=True)

@@ -716,6 +716,9 @@ Definition of Done:
 - после первой retrieval hot-path optimization concurrent baselines улучшились:
   - `500 memories` / `8-way concurrency` -> `avg ~914ms`, `p95 ~1110ms`
   - `1000 memories` / `8-way concurrency` -> `avg ~1592ms`, `p95 ~1881ms`
+- после storage-side tuning concurrent baselines дополнительно улучшились:
+  - `500 memories` / `8-way concurrency` -> `avg ~863ms`, `p95 ~1015ms`
+  - `1000 memories` / `8-way concurrency` -> `avg ~1594ms`, `p95 ~1727ms`
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

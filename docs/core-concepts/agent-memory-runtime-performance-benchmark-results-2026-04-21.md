@@ -202,3 +202,39 @@ The runtime now shows:
 - `improving but still important` concurrent recall latency under `8-way` load
 
 The next likely performance wins will come from reducing Python-side work further or lowering DB/session contention under parallel recall.
+
+## Storage-Side Tuning Follow-Up
+
+After the retrieval hot-path optimization, the storage/query path was also tightened:
+
+- `episodes` now has composite indexes aligned with recall filters and ordering
+- `audit_log` now has composite indexes aligned with feedback lookups and recent-action scans
+- `feedback_score_by_entity()` now fast-exits when the namespace has no recall feedback at all, instead of running a large grouped `IN (...)` query across the full candidate pool
+
+### Before / After
+
+These numbers compare the post-hot-path baseline against the same benchmark after storage-side tuning.
+
+| Memories | Metric | Before | After | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `500` | `avg latency` | `913.5ms` | `862.8ms` | `-50.7ms` |
+| `500` | `p95 latency` | `1110ms` | `1015ms` | `-95ms` |
+| `500` | `throughput` | `8.5269 rps` | `9.0887 rps` | `+0.5618 rps` |
+| `1000` | `avg latency` | `1592.25ms` | `1594.225ms` | `+1.975ms` |
+| `1000` | `p95 latency` | `1881ms` | `1727ms` | `-154ms` |
+| `1000` | `throughput` | `4.9045 rps` | `4.9116 rps` | `+0.0071 rps` |
+
+### Interpretation
+
+- the storage-side changes helped `500`-memory concurrent load in a clearly measurable way
+- at `1000` memories, average latency stayed roughly flat, which suggests the current dominant bottleneck is no longer the no-feedback audit lookup
+- however, the `p95` tail improved noticeably at `1000`, which is still a useful production signal
+- these changes are also forward-looking: they are more likely to matter in the real Postgres deployment path than in the current SQLite in-process benchmark harness
+
+### Updated Production-Oriented Takeaway
+
+The concurrent recall story now looks like this:
+
+- Python-side hot-path work was a real and important bottleneck
+- storage/query tuning gives additional headroom, especially on smaller large-pool loads and latency tails
+- the next optimization frontier is increasingly about DB/session contention and query shape under true parallel load, especially for `1000+` candidate pools

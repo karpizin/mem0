@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -15,6 +15,11 @@ def _utcnow() -> datetime:
 
 class Episode(Base):
     __tablename__ = "episodes"
+    __table_args__ = (
+        Index("ix_episodes_namespace_created_at", "namespace_id", "created_at"),
+        Index("ix_episodes_namespace_agent_created_at", "namespace_id", "agent_id", "created_at"),
+        Index("ix_episodes_namespace_session_created_at", "namespace_id", "session_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     namespace_id: Mapped[str] = mapped_column(String(36), ForeignKey("namespaces.id"), index=True)
