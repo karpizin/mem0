@@ -470,5 +470,337 @@
         }
       ]
     }
+  },
+  {
+    "id": "coffee-chat-preferences",
+    "description": "A noisy coffee-planning chat should preserve stable drink preferences while dropping momentary logistics and acknowledgements.",
+    "annotation_notes": "Manual annotation: this mimics a messy group chat. Stable drink preferences should become durable memory; weather chatter, today's route details, and short acknowledgements should not.",
+    "namespace_mode": "isolated",
+    "agent_name": "coffee-helper",
+    "session_id": "dialogue-coffee-preferences",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note for today: I'll pass by the south entrance after the meeting."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "For future coffee orders, Vera only drinks decaf after lunch and Oleg wants no sugar."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Got it."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "Vera only drinks decaf after lunch",
+          "Oleg wants no sugar"
+        ],
+        "must_not_contain": [
+          "south entrance after the meeting",
+          "Got it"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-coffee-preferences-recall",
+          "query": "What coffee preferences should I remember for future orders?",
+          "must_contain": [
+            "decaf after lunch",
+            "no sugar"
+          ],
+          "must_not_contain": [
+            "south entrance after the meeting",
+            "Got it"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "school-pickup-procedure-and-noise",
+    "description": "A family logistics chat should preserve a recurring pickup procedure while dropping day-specific timing noise.",
+    "annotation_notes": "Manual annotation: the pickup rule is durable procedure-like guidance; the same-day timing note and acknowledgement should stay out of durable memory.",
+    "namespace_mode": "isolated",
+    "agent_name": "family-ops",
+    "session_id": "dialogue-school-pickup",
+    "dialogue": [
+      {
+        "event_type": "policy_update",
+        "event_origin": "user_input",
+        "space_hint": "agent-core",
+        "role": "user",
+        "content": "For future school pickup delays, always text the family group before calling the driver."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note for today: pickup will happen at the back gate because the front lane is blocked."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "text the family group before calling the driver"
+        ],
+        "must_not_contain": [
+          "back gate because the front lane is blocked",
+          "Thanks"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-school-pickup-recall",
+          "query": "What family communication step should happen before contacting the driver?",
+          "must_contain": [
+            "family group before calling the driver"
+          ],
+          "must_not_contain": [
+            "Thanks"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "household-maintenance-recurring-facts",
+    "description": "A maintenance thread should retain recurring household facts while ignoring one-off appointment chatter.",
+    "annotation_notes": "Manual annotation: the filter size and recurring reorder cadence are durable maintenance facts; the repair window is one-off noise.",
+    "namespace_mode": "isolated",
+    "agent_name": "home-maintenance",
+    "session_id": "dialogue-maintenance",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "The boiler filter size is 16x20x1 and we reorder it every month."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note: the technician is coming this Thursday between 2 and 4 pm."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Okay."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "boiler filter size is 16x20x1",
+          "reorder it every month"
+        ],
+        "must_not_contain": [
+          "this Thursday between 2 and 4 pm",
+          "Okay"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-maintenance-recall",
+          "query": "What recurring maintenance facts should I remember about the boiler filter?",
+          "must_contain": [
+            "16x20x1",
+            "every month"
+          ],
+          "must_not_contain": [
+            "this Thursday between 2 and 4 pm",
+            "Okay"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "delivery-rule-with-temporary-code",
+    "description": "A building-delivery chat should keep the long-term delivery rule while dropping a temporary access code.",
+    "annotation_notes": "Manual annotation: the weekday delivery rule is durable household logistics; the access code is explicitly temporary and should not survive in long-term memory.",
+    "namespace_mode": "isolated",
+    "agent_name": "delivery-helper",
+    "session_id": "dialogue-delivery-rule",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "For future weekday deliveries, always leave parcels with concierge Marta if nobody answers."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note: the code for tonight only is 4821."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "leave parcels with concierge Marta if nobody answers"
+        ],
+        "must_not_contain": [
+          "4821",
+          "Thanks"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+            "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-delivery-rule-recall",
+          "query": "If nobody answers during a weekday delivery, who should receive the parcel?",
+          "must_contain": [
+            "concierge Marta"
+          ],
+          "must_not_contain": [
+            "4821",
+            "Thanks"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "travel-chat-seating-and-meal-preferences",
+    "description": "A travel planning chat should preserve stable passenger preferences while ignoring short-lived flight chatter.",
+    "annotation_notes": "Manual annotation: seat and meal preferences are durable travel facts; same-day gate chatter and acknowledgement should not become long-term memory.",
+    "namespace_mode": "isolated",
+    "agent_name": "travel-helper",
+    "session_id": "dialogue-travel-preferences",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "For future flights, Dana prefers an aisle seat and Sam needs a vegetarian meal."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note: today's gate changed to C14 and boarding is delayed by 20 minutes."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Got it."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "Dana prefers an aisle seat",
+          "Sam needs a vegetarian meal"
+        ],
+        "must_not_contain": [
+          "gate changed to C14",
+          "delayed by 20 minutes",
+          "Got it"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-travel-preferences-recall",
+          "query": "What travel preferences should I remember for Dana and Sam?",
+          "must_contain": [
+            "aisle seat",
+            "vegetarian meal"
+          ],
+          "must_not_contain": [
+            "gate changed to C14",
+            "delayed by 20 minutes",
+            "Got it"
+          ]
+        }
+      ]
+    }
   }
 ]
