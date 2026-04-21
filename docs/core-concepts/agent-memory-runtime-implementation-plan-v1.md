@@ -696,6 +696,7 @@ Definition of Done:
 - `make dialogue-eval` прогоняет manually annotated multi-turn dialogue fixtures и проверяет storage + audit + recall как единый memory outcome
 - dialogue-eval теперь покрывает и scripted rescue scenarios с `negative feedback`, проверяя не только `audit.reason`, но и `audit.signal_values`
 - retrieval/openclaw regressions теперь отдельно покрывают high-density cases на `~40` и `120` memories, чтобы проверять selection, anti-noise и compact injection под budget
+- e2e adapter recall теперь тоже покрывает high-density memory pools, проверяя итоговый `brief` и `trace` на `41` и `120` memories
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

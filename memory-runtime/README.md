@@ -256,6 +256,7 @@ Promotion decision layer теперь включает и первый `rescue l
 Дополнительно retrieval и injection теперь имеют explicit high-density regressions:
 - unit-тест на `~40` candidate memories проверяет, что brief остается релевантным и не засоряется шумом
 - legacy recall test на `120` memories проверяет, что OpenClaw все равно подмешивает только компактный top-slice в рамках budget
+- e2e adapter recall test теперь отдельно прогоняет `41`-memory mixed-slot scenario и `120`-memory durable-only scenario, проверяя конечный `brief`, `trace.selected_count` и отсутствие noisy leakage в итоговом recall ответе
 `make compare-eval BEFORE=... AFTER=...` сравнивает два machine-readable eval report и показывает, где качество улучшилось, регрессировало или осталось без изменений.
 Adversarial eval suite теперь покрывает instruction override, prompt exfiltration, explicit memory poisoning, mixed malicious content и benign control cases.
 `make snapshot-pilot NAME=...` сохраняет SQL dump pilot-базы, observability snapshot и текущие pilot reports в `.artifacts/pilot_snapshots/<name>/`.
