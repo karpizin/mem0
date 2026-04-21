@@ -5,6 +5,8 @@
 Документ опирается на:
 
 - [agent-memory-runtime-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1.md)
+- [agent-memory-runtime-product-definition-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-product-definition-v1.md)
+- [agent-memory-runtime-v1-product-gap-map.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1-product-gap-map.md)
 - [agent-memory-runtime-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-system-design-v1.md)
 - [agent-memory-runtime-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-mcp-spec-v1.md)
 - [agent-memory-runtime-long-term-memory-roadmap.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-long-term-memory-roadmap.md)
