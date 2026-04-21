@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.jobs import JobRepository
-from app.schemas.observability import JobStats, MCPStats, ObservabilityStats
+from app.schemas.observability import JobStats, MCPStats, ObservabilityStats, PromotionQualityStats
 from app.telemetry.metrics import render_prometheus_metrics, snapshot_mcp_metrics, snapshot_metrics
 
 
@@ -17,17 +17,20 @@ class ObservabilityService:
         self.settings = get_settings()
 
     def metrics_payload(self) -> str:
+        quality = self.audit.promotion_quality_summary()
         return render_prometheus_metrics(
             counters=self._metrics_snapshot(),
             job_status_counts=self._job_status_counts(),
             job_type_status_counts=self.jobs.count_by_type_and_status(),
             mcp_metrics=snapshot_mcp_metrics(),
+            quality_metrics=quality,
         )
 
     def stats(self) -> ObservabilityStats:
         metrics = self._metrics_snapshot()
         by_status = self._job_status_counts()
         by_type_status = self.jobs.count_by_type_and_status()
+        quality = self.audit.promotion_quality_summary()
         by_type: dict[str, dict[str, int]] = {}
         for (job_type, status), count in by_type_status.items():
             by_type.setdefault(job_type, {})[status] = count
@@ -43,6 +46,7 @@ class ObservabilityService:
                 ),
             ),
             mcp=MCPStats(**snapshot_mcp_metrics()),
+            quality=PromotionQualityStats(**quality),
         )
 
     def _job_status_counts(self) -> dict[str, int]:

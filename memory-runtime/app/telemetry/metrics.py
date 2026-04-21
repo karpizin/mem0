@@ -179,11 +179,13 @@ def render_prometheus_metrics(
     job_status_counts: dict[str, int] | None = None,
     job_type_status_counts: dict[tuple[str, str], int] | None = None,
     mcp_metrics: dict[str, dict] | None = None,
+    quality_metrics: dict[str, dict] | None = None,
 ) -> str:
     metric_values = counters or snapshot_metrics()
     job_status_counts = job_status_counts or {}
     job_type_status_counts = job_type_status_counts or {}
     mcp_metrics = mcp_metrics or snapshot_mcp_metrics()
+    quality_metrics = quality_metrics or {}
 
     lines: list[str] = []
     for name in sorted(_METRIC_DEFINITIONS):
@@ -252,6 +254,36 @@ def render_prometheus_metrics(
     lines.append("# TYPE memory_runtime_mcp_tool_latency_bucket_total counter")
     for bucket, value in sorted((mcp_metrics.get("tool_latency_buckets_ms") or {}).items()):
         lines.append(f'memory_runtime_mcp_tool_latency_bucket_total{{bucket_ms="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_promotion_decision_total Promotion decisions grouped by outcome and reason.")
+    lines.append("# TYPE memory_runtime_promotion_decision_total counter")
+    for reason_name, reason_counts in (
+        ("promote", quality_metrics.get("promote_reasons") or {}),
+        ("session_only", quality_metrics.get("session_only_reasons") or {}),
+        ("reject", quality_metrics.get("reject_reasons") or {}),
+    ):
+        for reason, value in sorted(reason_counts.items()):
+            lines.append(
+                f'memory_runtime_promotion_decision_total{{outcome="{reason_name}",reason="{reason}"}} {value}'
+            )
+
+    lines.append("# HELP memory_runtime_promotion_signal_total Promotion-decision signal flags set to true.")
+    lines.append("# TYPE memory_runtime_promotion_signal_total counter")
+    for signal_name, value in sorted((quality_metrics.get("signal_flags") or {}).items()):
+        lines.append(f'memory_runtime_promotion_signal_total{{signal="{signal_name}"}} {value}')
+
+    lines.append("# HELP memory_runtime_promotion_novelty_state_total Promotion decisions grouped by novelty state.")
+    lines.append("# TYPE memory_runtime_promotion_novelty_state_total counter")
+    for state, value in sorted((quality_metrics.get("novelty_states") or {}).items()):
+        lines.append(f'memory_runtime_promotion_novelty_state_total{{state="{state}"}} {value}')
+
+    rescue = quality_metrics.get("rescue") or {}
+    lines.append("# HELP memory_runtime_rescue_event_total Rescue outcomes grouped by status and key.")
+    lines.append("# TYPE memory_runtime_rescue_event_total counter")
+    for trigger, value in sorted((rescue.get("applied_by_trigger") or {}).items()):
+        lines.append(f'memory_runtime_rescue_event_total{{status="applied",key="{trigger}"}} {value}')
+    for reason, value in sorted((rescue.get("blocked_by_reason") or {}).items()):
+        lines.append(f'memory_runtime_rescue_event_total{{status="blocked",key="{reason}"}} {value}')
 
     return "\n".join(lines) + "\n"
 

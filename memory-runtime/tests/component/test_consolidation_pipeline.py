@@ -101,11 +101,13 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(processed, 1)
         with get_engine().connect() as connection:
             memory_units_count = connection.execute(text("SELECT COUNT(*) FROM memory_units")).scalar_one()
-            audit_count = connection.execute(text("SELECT COUNT(*) FROM audit_log")).scalar_one()
+            audit_actions = connection.execute(
+                text("SELECT action FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
             status = connection.execute(text("SELECT status FROM jobs LIMIT 1")).scalar_one()
 
         self.assertEqual(memory_units_count, 1)
-        self.assertEqual(audit_count, 1)
+        self.assertEqual([row[0] for row in audit_actions], ["memory_candidate_promoted", "memory_unit_created"])
         self.assertEqual(status, "completed")
 
     def test_duplicate_ingestion_does_not_enqueue_extra_consolidation_job(self) -> None:
@@ -136,7 +138,7 @@ class ConsolidationPipelineTests(unittest.TestCase):
             ).fetchall()
 
         self.assertEqual(memory_units_count, 1)
-        self.assertEqual([row[0] for row in audit_actions], ["memory_unit_created"])
+        self.assertEqual([row[0] for row in audit_actions], ["memory_candidate_promoted", "memory_unit_created"])
 
     def test_worker_merges_semantically_equivalent_decision_phrasings(self) -> None:
         first_payload = {
@@ -179,7 +181,15 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row[0], "decision")
         self.assertEqual(row[1], 1)
-        self.assertEqual([item[0] for item in audit_actions], ["memory_unit_created", "memory_unit_merged"])
+        self.assertEqual(
+            [item[0] for item in audit_actions],
+            [
+                "memory_candidate_promoted",
+                "memory_unit_created",
+                "memory_candidate_promoted",
+                "memory_unit_merged",
+            ],
+        )
 
     def test_worker_supersedes_contradictory_fact_in_same_space(self) -> None:
         first_payload = {
@@ -227,7 +237,15 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(memory_rows[1][0], "active")
         self.assertIsNotNone(memory_rows[1][1])
         self.assertIn("do not use Postgres", memory_rows[1][2])
-        self.assertEqual([item[0] for item in audit_actions], ["memory_unit_created", "memory_unit_superseded"])
+        self.assertEqual(
+            [item[0] for item in audit_actions],
+            [
+                "memory_candidate_promoted",
+                "memory_unit_created",
+                "memory_candidate_promoted",
+                "memory_unit_superseded",
+            ],
+        )
 
     def test_worker_rejects_low_trust_long_term_candidate(self) -> None:
         payload = {
@@ -422,7 +440,9 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertIn("Please note this.", memory_rows[0][0])
         self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
         self.assertIn("insufficient_specificity_not_durable", str(audit_rows[0][1]))
-        self.assertEqual(audit_rows[1][0], "memory_unit_created")
+        self.assertEqual(audit_rows[1][0], "memory_candidate_promoted")
+        self.assertIn("rescue_loop_promoted", str(audit_rows[1][1]))
+        self.assertEqual(audit_rows[2][0], "memory_unit_created")
 
     def test_worker_does_not_rescue_repeated_weak_candidate_after_negative_feedback(self) -> None:
         payload = {

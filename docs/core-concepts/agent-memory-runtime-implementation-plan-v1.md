@@ -231,6 +231,7 @@
 - gauges по job status и job type/status
 - recall counters
 - worker failure counters
+- quality-facing promotion/rescue breakdown из `audit_log`
 
 Тестовое покрытие для этого слоя включает:
 
@@ -248,6 +249,7 @@
 - operational JSON stats endpoint реализован
 - counters для recall/jobs/lifecycle/consolidation экспортируются наружу
 - worker-derived counters теперь собираются из shared DB state, а не зависят от process-local памяти API
+- quality observability теперь показывает `promote / session_only / reject`, причины demotion/rejection/promotion и rescue applied/blocked breakdown
 - test suite и lint проходят
 
 ### Текущий прогресс `Phase I`

@@ -290,6 +290,25 @@ class ConsolidationService:
                 signals=promotion.signals,
             )
             return "ignored", episode.id
+
+        self.audit.create(
+            namespace_id=episode.namespace_id,
+            agent_id=episode.agent_id,
+            entity_type="episode",
+            entity_id=episode.id,
+            action="memory_candidate_promoted",
+            details_json={
+                "space_type": space_type,
+                "event_type": event_type,
+                "event_origin": event_origin,
+                "kind": kind,
+                "merge_key": merge_key,
+                "reason": promotion.reason,
+                "effective_scope": promotion.effective_scope,
+                "signals": promotion.signals,
+                "classification": "promotion_decision",
+            },
+        )
         scope = promotion.effective_scope
         if existing is None and contradictory is None:
             memory_unit = self.memory_units.create(

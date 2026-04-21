@@ -138,6 +138,16 @@ Consolidation baseline теперь умеет:
 `/metrics` отдает Prometheus-compatible экспорт counters и job gauges, а `/v1/observability/stats` дает JSON-срез для локальной диагностики и dashboard bootstrap.
 Worker-derived operational counters (`jobs_*`, `consolidation_*`, `lifecycle_*`) теперь считаются из shared DB state (`jobs` и `audit_log`), а не только из process-local памяти.
 `/v1/observability/stats` также показывает `oldest_pending_age_seconds` и `stalled_running_count`, чтобы было проще увидеть backlog или зависшие worker jobs.
+Observability теперь включает и quality-oriented breakdown для promotion/rescue policy:
+- `quality.decisions_by_outcome` для `promote / session_only / reject`
+- `quality.*_reasons` для top причин demotion/rejection/promotion
+- `quality.signal_flags` для `low_trust`, `transient`, `low_value`, `weak_candidate`, `rescue_applied`, `rescue_blocked`
+- `quality.rescue.*` для breakdown по `rescue_trigger` и `rescue_block_reason`
+Эти же данные экспортируются через `/metrics` как:
+- `memory_runtime_promotion_decision_total`
+- `memory_runtime_promotion_signal_total`
+- `memory_runtime_promotion_novelty_state_total`
+- `memory_runtime_rescue_event_total`
 `/v1/recall/feedback` записывает usefulness signals, которые потом участвуют в последующем ranking.
 При включенном `mem0 bridge` runtime может синхронизировать long-term memories в `mem0` и использовать его как внешний recall source.
 `POST /mcp/{client_name}/http/{user_id}` реализует stateless MCP Streamable HTTP facade поверх тех же runtime services.
