@@ -338,6 +338,19 @@
 - Python component tests и TypeScript tests проходят
 - test suite и lint проходят
 
+Отдельно зафиксирован следующий product-facing слой:
+
+- [agent-memory-runtime-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-memory-review-surface-v1.md)
+
+Он описывает минимальный `v1 memory review surface` поверх уже реализованного adapter contract:
+
+- `view`
+- `update`
+- `force forget`
+- `mark incorrect`
+- `private / group` scopes
+- sensitive marker behavior
+
 ### OpenClaw Pilot Readiness
 
 После `Phase J` в проекте реализован readiness contour для первого `OpenClaw-only` MVP-пилота:

@@ -37,6 +37,18 @@
 - без этого память ощущается как black box
 - correction loop остается слишком техническим
 
+Что уже закрыто:
+
+- backend adapter review contract уже есть
+- `view / update / force forget / mark incorrect` поддержаны на runtime surface
+- semantics для durable и session memory уже зафиксированы
+
+Что остается:
+
+- построить минимальный user/operator-facing review UI
+- отразить `private / group` scopes как видимую product-сущность
+- аккуратно показать sensitive markers
+
 #### 1.2. Scoped Sharing As Product Concept
 
 Что нужно:
@@ -219,6 +231,10 @@ Graph memory важна как future architecture direction, но не как �
 9. explainability surface
 10. graph memory UX
 11. more advanced sharing / ACL logic
+
+Отдельный spec для следующего шага уже зафиксирован:
+
+- [agent-memory-runtime-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-memory-review-surface-v1.md)
 
 ## Practical Definition Of “Good v1 Product”
 
