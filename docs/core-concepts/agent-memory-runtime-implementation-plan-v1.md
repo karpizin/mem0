@@ -708,6 +708,7 @@ Definition of Done:
   - `session_pressure`
   - `integration_mix`
   и возвращает latency/candidate/brief-size baseline по каждому профилю и overall summary
+- есть отдельный `make soak-benchmark`, который проверяет repeated-recall stability на одном крупном memory pool и измеряет failure rate, latency drift, selected-count stability и brief-size stability
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

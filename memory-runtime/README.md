@@ -243,6 +243,7 @@ make dialogue-eval
 make lifecycle-eval
 make continuity-benchmark
 make performance-benchmark
+make soak-benchmark
 make compare-eval BEFORE=/path/to/before.json AFTER=/path/to/after.json
 make snapshot-pilot NAME=before-live
 make restore-pilot SNAPSHOT=before-live
@@ -308,6 +309,11 @@ Promotion decision layer теперь включает и первый `rescue l
 - `session_pressure`
 - `integration_mix`
 При желании можно прогонять и любой отдельный профиль через `--scenario <name>`.
+`make soak-benchmark ARGS="--memory-count 500 --iterations 50 --scenario balanced_runtime"` выполняет repeated-recall soak run на одном большом memory pool и возвращает:
+- `failure_rate`
+- `latency_ms` (`min / avg / p50 / p95 / max`)
+- `selected_count`
+- `brief_chars`
 Дополнительно retrieval и injection теперь имеют explicit high-density regressions:
 - unit-тест на `~40` candidate memories проверяет, что brief остается релевантным и не засоряется шумом
 - legacy recall test на `120` memories проверяет, что OpenClaw все равно подмешивает только компактный top-slice в рамках budget
