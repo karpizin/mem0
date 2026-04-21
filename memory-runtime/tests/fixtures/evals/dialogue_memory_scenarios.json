@@ -1,0 +1,170 @@
+[
+  {
+    "id": "architecture-decision-with-scratch-noise",
+    "description": "A durable architecture decision should survive while temporary scratch planning stays out of long-term memory.",
+    "annotation_notes": "Manual annotation: the stack choice is durable project context; the env-var rename note is explicitly temporary and should be demoted to session-only.",
+    "namespace_mode": "isolated",
+    "agent_name": "architect",
+    "session_id": "dialogue-architecture",
+    "dialogue": [
+      {
+        "event_type": "architecture_decision",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Decision: use Postgres, Redis, and pgvector as the baseline stack for the memory runtime."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note: maybe rename the env vars after the pilot."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "use Postgres, Redis, and pgvector as the baseline stack"
+        ],
+        "must_not_contain": [
+          "rename the env vars after the pilot"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-architecture-recall",
+          "query": "What baseline stack decision already exists for the memory runtime?",
+          "must_contain": [
+            "Postgres, Redis, and pgvector as the baseline stack"
+          ],
+          "must_not_contain": [
+            "rename the env vars after the pilot"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "standing-procedure-with-acknowledgement",
+    "description": "A reusable procedure should persist, while a low-value acknowledgement should not become durable memory.",
+    "annotation_notes": "Manual annotation: the style rule is a standing procedure; the short assistant acknowledgement is operationally harmless and should be filtered from durable memory.",
+    "namespace_mode": "isolated",
+    "agent_name": "planner",
+    "session_id": "dialogue-procedure",
+    "dialogue": [
+      {
+        "event_type": "policy_update",
+        "event_origin": "user_input",
+        "space_hint": "agent-core",
+        "role": "user",
+        "content": "For future architecture updates, always start with a concise summary before the implementation details."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "start with a concise summary before the implementation details"
+        ],
+        "must_not_contain": [
+          "Thanks"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-procedure-recall",
+          "query": "How should architecture updates be presented?",
+          "must_contain": [
+            "concise summary before the implementation details"
+          ],
+          "must_not_contain": [
+            "Thanks"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "user-reported-timeout-issue",
+    "description": "A user-reported operational issue should remain durable even when it contains timeout language that resembles noisy status chatter.",
+    "annotation_notes": "Manual annotation: the timeout report is useful project memory because it describes a real recurring issue; the assistant acknowledgement is low-value and should be demoted.",
+    "namespace_mode": "isolated",
+    "agent_name": "operator",
+    "session_id": "dialogue-timeout",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "The provider timed out after 15 seconds when recall tried to load memory before the answer."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "provider timed out after 15 seconds when recall tried to load memory before the answer"
+        ],
+        "must_not_contain": [
+          "Thanks"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "assistant_ack_not_durable"
+        ],
+        "must_not_include_reasons": [
+          "operational_status_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-timeout-recall",
+          "query": "What issue was reported about recall behavior?",
+          "must_contain": [
+            "provider timed out after 15 seconds"
+          ],
+          "must_not_contain": [
+            "Thanks"
+          ]
+        }
+      ]
+    }
+  }
+]

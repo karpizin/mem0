@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPORT_DIR="$ROOT_DIR/.artifacts"
+REPORT_PATH="$REPORT_DIR/dialogue_memory_eval_report.json"
+TMP_REPORT_PATH="$REPORT_PATH.tmp"
+PYTHON_BIN="$(bash "$ROOT_DIR/scripts/resolve_python.sh")"
+
+mkdir -p "$REPORT_DIR"
+
+cd "$ROOT_DIR"
+"$PYTHON_BIN" -m app.dialogue_eval "$@" > "$TMP_REPORT_PATH"
+mv "$TMP_REPORT_PATH" "$REPORT_PATH"
+
+printf 'Dialogue memory eval report saved to %s\n' "$REPORT_PATH"
+if command -v jq >/dev/null 2>&1; then
+  jq . "$REPORT_PATH"
+else
+  cat "$REPORT_PATH"
+fi

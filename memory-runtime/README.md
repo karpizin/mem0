@@ -183,6 +183,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - idempotent ingestion for duplicate events on the same dedupe key
 - recall trace explainability with decisive selection signals
 - golden compactness regression for low-budget memory briefs
+- dialogue-based memory eval with manually annotated curated conversations, checking long-term promotion, demotion/rejection audit trail, and recall quality together
 - MCP Streamable HTTP facade with tools/resources/prompts contract, safe write tools, and transport validation
 - отдельный MCP smoke runner для быстрой проверки guarded write/read flow на живом контуре
 - MCP edge-case coverage для `shared-space` writes, приватности private `project-space` и guardrails на `agent-core`
@@ -201,6 +202,7 @@ make pilot-negative-scenarios
 make openclaw-live-pilot
 make pilot-scorecard INPUT=/path/to/live_scorecard.json
 make quality-eval
+make dialogue-eval
 make lifecycle-eval
 make continuity-benchmark
 make compare-eval BEFORE=/path/to/before.json AFTER=/path/to/after.json
@@ -234,6 +236,11 @@ Live runner теперь имеет отдельный process-timeout guard и 
 `make pilot-scorecard INPUT=...` считает live-pilot summary и verdict по заполненному JSON scorecard.
 `make quality-eval` прогоняет 10 golden recall scenarios, печатает JSON report и служит регрессионным барьером для retrieval tuning.
 В quality report теперь есть не только `pass/fail`, но и `required_hit_rate`, `forbidden_leak_rate`, `avg_selected_count` и `mean_scenario_score`.
+`make dialogue-eval` прогоняет curated dialogue scenarios из `tests/fixtures/evals/dialogue_memory_scenarios.json`, создает для каждого отдельный namespace/session и проверяет:
+- что попало в `long-term` memory
+- что было демотировано или отклонено по `audit_log`
+- что потом реально вспоминается через `recall`
+Первые сценарии в этом наборе размечены вручную и служат baseline для future external dialogue corpora.
 `make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
 `make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.
 `make compare-eval BEFORE=... AFTER=...` сравнивает два machine-readable eval report и показывает, где качество улучшилось, регрессировало или осталось без изменений.

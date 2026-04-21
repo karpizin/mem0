@@ -693,6 +693,7 @@ Definition of Done:
 Подтверждение:
 
 - `make quality-eval` прогоняет golden recall scenarios
+- `make dialogue-eval` прогоняет manually annotated multi-turn dialogue fixtures и проверяет storage + audit + recall как единый memory outcome
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 
@@ -1215,6 +1216,10 @@ Definition of Done:
 - low-value assistant/tool status notes such as timeout messages and acknowledgement-style turns now demote to `session_only`
 - weak new assistant/tool/operator facts now demote to `session_only` as `insufficient_specificity_not_durable`
   while reinforcing existing durable memories can still merge/promote
+- dialogue-based eval now exists as a regression layer for this policy:
+  - curated multi-turn fixtures
+  - manual annotations for the first dialogues
+  - combined checks for long-term promotion, demotion/rejection audit trail, and recall
 - mixed OpenClaw capture turns now drop `system` messages on ingestion when `user`/`assistant` content is present, so system/bootstrap prompt text no longer gets promoted as a durable fact
 - structured JSON logs now cover:
   - ingestion
