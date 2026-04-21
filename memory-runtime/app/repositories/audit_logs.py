@@ -132,8 +132,10 @@ class AuditLogRepository:
         )
         positive_feedback_count = sum(1 for score in feedback_scores.values() if score > 0)
         negative_feedback_count = sum(1 for score in feedback_scores.values() if score < 0)
+        net_feedback_score = sum(feedback_scores.values())
         return {
             "demoted_count": len(matching_episode_ids),
             "positive_feedback_count": positive_feedback_count,
             "negative_feedback_count": negative_feedback_count,
+            "net_feedback_score": int(net_feedback_score),
         }

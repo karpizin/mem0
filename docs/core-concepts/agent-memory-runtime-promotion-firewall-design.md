@@ -171,6 +171,9 @@ Current implementation status:
 - rescue is intentionally conservative:
   - repeated `insufficient_specificity_not_durable` candidates can now promote on a later recurrence
   - `session_only` candidates with positive recall feedback can now promote later, including some transient candidates
+- second rescue iteration now also accounts for negative feedback:
+  - repeated weak candidates no longer rescue if prior negative feedback exists
+  - mixed positive/negative feedback only rescues when feedback is net-positive
 - rescue does **not** apply to:
   - low-trust rejections
   - provenance-blocked origins such as `recalled_memory` or `system_boot`

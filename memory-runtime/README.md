@@ -244,6 +244,9 @@ Live runner теперь имеет отдельный process-timeout guard и 
 Promotion decision layer теперь включает и первый `rescue loop`:
 - повторяющиеся `session_only` кандидаты с причиной `insufficient_specificity_not_durable` могут позже продвинуться в durable memory
 - `session_only` кандидаты с positive recall feedback тоже могут позже быть promoted
+- negative feedback теперь тоже влияет на rescue:
+  - повторяющийся слабый сигнал не rescue'ится, если у похожих прошлых эпизодов уже был negative feedback
+  - mixed feedback требует net-positive history, иначе кандидат остается `session_only`
 - при этом acknowledgement/status chatter и blocked origins не получают такого апгрейда “по инерции”
 `make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
 `make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.

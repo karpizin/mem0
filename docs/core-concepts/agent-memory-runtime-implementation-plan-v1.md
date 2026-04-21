@@ -1220,6 +1220,9 @@ Definition of Done:
   - repeated `insufficient_specificity_not_durable` candidates can later promote
   - `session_only` candidates with positive recall feedback can later promote
   - low-value acknowledgement/status chatter still does not get rescued by repetition alone
+- rescue loop now also uses negative feedback as a blocking signal:
+  - repeated weak candidates do not rescue if prior negative feedback exists
+  - mixed positive/negative feedback only rescues on net-positive history
 - dialogue-based eval now exists as a regression layer for this policy:
   - curated multi-turn fixtures
   - manual annotations for the first dialogues

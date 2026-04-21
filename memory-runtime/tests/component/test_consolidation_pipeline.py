@@ -423,3 +423,53 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
         self.assertIn("insufficient_specificity_not_durable", str(audit_rows[0][1]))
         self.assertEqual(audit_rows[1][0], "memory_unit_created")
+
+    def test_worker_does_not_rescue_repeated_weak_candidate_after_negative_feedback(self) -> None:
+        payload = {
+            "namespace_id": self.namespace_id,
+            "agent_id": self.agent_id,
+            "session_id": "run_weak_negative_1",
+            "source_system": "openclaw",
+            "event_type": "conversation_turn",
+            "space_hint": "project-space",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "Please note this.",
+                }
+            ],
+        }
+
+        first_response = self.client.post("/v1/events", json=payload)
+        first_processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(first_processed, 1)
+        feedback = self.client.post(
+            "/v1/recall/feedback",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "helpful": False,
+                "episode_ids": [first_response.json()["episode_id"]],
+                "query": "Was this weak note useful?",
+            },
+        )
+        self.assertEqual(feedback.status_code, 200)
+
+        second_payload = dict(payload)
+        second_payload["session_id"] = "run_weak_negative_2"
+        self.client.post("/v1/events", json=second_payload)
+        second_processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(second_processed, 1)
+        with get_engine().connect() as connection:
+            memory_units_count = connection.execute(text("SELECT COUNT(*) FROM memory_units")).scalar_one()
+            audit_rows = connection.execute(
+                text("SELECT action, details_json FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
+
+        self.assertEqual(memory_units_count, 0)
+        self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
+        self.assertEqual(audit_rows[1][0], "recall_feedback_negative")
+        self.assertEqual(audit_rows[2][0], "memory_candidate_demoted_session_only")
+        self.assertIn("negative_feedback_outweighs_rescue", str(audit_rows[2][1]))

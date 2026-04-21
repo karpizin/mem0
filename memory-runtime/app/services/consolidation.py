@@ -451,6 +451,7 @@ class ConsolidationService:
             "demoted_count": 0,
             "positive_feedback_count": 0,
             "negative_feedback_count": 0,
+            "net_feedback_score": 0,
         }
         low_trust_reason = cls.detect_low_trust_reason(content) if inferred_scope == "long-term" else None
         transient_reason = (
@@ -512,6 +513,7 @@ class ConsolidationService:
             "rescue_demoted_count": rescue_history["demoted_count"],
             "rescue_positive_feedback_count": rescue_history["positive_feedback_count"],
             "rescue_negative_feedback_count": rescue_history["negative_feedback_count"],
+            "rescue_net_feedback_score": rescue_history["net_feedback_score"],
         }
 
         if low_trust_reason is not None:
@@ -553,6 +555,14 @@ class ConsolidationService:
                 reason="rescue_loop_promoted",
                 signals=signals,
             )
+        rescue_block_reason = cls.detect_rescue_block_reason(
+            transient_reason=transient_reason,
+            weak_candidate_reason=weak_candidate_reason,
+            rescue_history=rescue_history,
+        )
+        if rescue_block_reason is not None:
+            signals["rescue_blocked"] = True
+            signals["rescue_block_reason"] = rescue_block_reason
 
         if transient_reason is not None:
             return PromotionDecision(
@@ -594,12 +604,39 @@ class ConsolidationService:
     ) -> str | None:
         positive_feedback_count = rescue_history.get("positive_feedback_count", 0)
         demoted_count = rescue_history.get("demoted_count", 0)
+        negative_feedback_count = rescue_history.get("negative_feedback_count", 0)
+        net_feedback_score = rescue_history.get("net_feedback_score", 0)
 
-        if positive_feedback_count > 0 and (transient_reason is not None or weak_candidate_reason is not None):
+        if (
+            positive_feedback_count > 0
+            and net_feedback_score > 0
+            and positive_feedback_count > negative_feedback_count
+            and (transient_reason is not None or weak_candidate_reason is not None)
+        ):
             return "positive_feedback"
-        if weak_candidate_reason is not None and demoted_count > 0:
+        if weak_candidate_reason is not None and demoted_count > 0 and negative_feedback_count == 0:
             return "repeated_session_only_candidate"
         return None
+
+    @staticmethod
+    def detect_rescue_block_reason(
+        *,
+        transient_reason: str | None,
+        weak_candidate_reason: str | None,
+        rescue_history: dict[str, int],
+    ) -> str | None:
+        if transient_reason is None and weak_candidate_reason is None:
+            return None
+
+        positive_feedback_count = rescue_history.get("positive_feedback_count", 0)
+        negative_feedback_count = rescue_history.get("negative_feedback_count", 0)
+        net_feedback_score = rescue_history.get("net_feedback_score", 0)
+
+        if negative_feedback_count <= 0:
+            return None
+        if positive_feedback_count > negative_feedback_count and net_feedback_score > 0:
+            return None
+        return "negative_feedback_outweighs_rescue"
 
     @classmethod
     def detect_transient_reason(

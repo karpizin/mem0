@@ -272,6 +272,7 @@ class ConsolidationServiceContractTests(unittest.TestCase):
                 "demoted_count": 1,
                 "positive_feedback_count": 0,
                 "negative_feedback_count": 0,
+                "net_feedback_score": 0,
             },
         )
 
@@ -294,9 +295,56 @@ class ConsolidationServiceContractTests(unittest.TestCase):
                 "demoted_count": 1,
                 "positive_feedback_count": 1,
                 "negative_feedback_count": 0,
+                "net_feedback_score": 1,
             },
         )
 
         self.assertEqual(decision.decision, "promote")
         self.assertEqual(decision.reason, "rescue_loop_promoted")
         self.assertEqual(decision.signals["rescue_trigger"], "positive_feedback")
+
+    def test_evaluate_promotion_decision_blocks_repeated_rescue_when_negative_feedback_exists(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Please note this.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+            rescue_history={
+                "demoted_count": 2,
+                "positive_feedback_count": 0,
+                "negative_feedback_count": 1,
+                "net_feedback_score": -1,
+            },
+        )
+
+        self.assertEqual(decision.decision, "session_only")
+        self.assertEqual(decision.reason, "insufficient_specificity_not_durable")
+        self.assertEqual(decision.signals["rescue_blocked"], True)
+        self.assertEqual(decision.signals["rescue_block_reason"], "negative_feedback_outweighs_rescue")
+
+    def test_evaluate_promotion_decision_does_not_rescue_on_mixed_feedback_without_net_positive(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="user_input",
+            inferred_scope="long-term",
+            content="Temporary scratch note: this timeout issue happens before every pilot demo.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+            rescue_history={
+                "demoted_count": 2,
+                "positive_feedback_count": 1,
+                "negative_feedback_count": 1,
+                "net_feedback_score": 0,
+            },
+        )
+
+        self.assertEqual(decision.decision, "session_only")
+        self.assertEqual(decision.reason, "temporary_scratch_not_durable")
+        self.assertEqual(decision.signals["rescue_blocked"], True)
+        self.assertEqual(decision.signals["rescue_block_reason"], "negative_feedback_outweighs_rescue")
