@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.event import ALLOWED_EVENT_ORIGINS, ALLOWED_SPACE_HINTS, EventMessage, EventRead
 from app.schemas.recall import MemoryBrief, RecallTrace
@@ -102,3 +102,17 @@ class AdapterMemorySearchResponse(BaseModel):
     adapter: str
     source_system: str
     results: list[AdapterMemoryRead] = Field(default_factory=list)
+
+
+class AdapterMemoryReviewRequest(BaseModel):
+    content: str | None = Field(default=None, min_length=1)
+    mark_incorrect: bool = False
+    reason: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_review_action(self) -> "AdapterMemoryReviewRequest":
+        if self.content is None and not self.mark_incorrect:
+            raise ValueError("Provide content to update a memory or set mark_incorrect=true")
+        if self.content is not None and self.mark_incorrect:
+            raise ValueError("Update and mark_incorrect cannot be requested at the same time")
+        return self

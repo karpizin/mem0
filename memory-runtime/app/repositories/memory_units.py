@@ -118,6 +118,29 @@ class MemoryUnitRepository:
         )
         return self.session.execute(stmt).one_or_none()
 
+    def update_content(
+        self,
+        memory_unit: MemoryUnit,
+        *,
+        content: str,
+        summary: str,
+        merge_key: str,
+        is_sensitive: bool,
+        sensitivity_reason: str | None,
+    ) -> MemoryUnit:
+        memory_unit.content = content
+        memory_unit.summary = summary
+        memory_unit.merge_key = merge_key
+        memory_unit.is_sensitive = is_sensitive
+        memory_unit.sensitivity_reason = sensitivity_reason
+        self.session.flush()
+        return memory_unit
+
+    def mark_incorrect(self, memory_unit: MemoryUnit) -> MemoryUnit:
+        memory_unit.status = "incorrect"
+        self.session.flush()
+        return memory_unit
+
     def delete(self, memory_unit: MemoryUnit) -> None:
         self.session.delete(memory_unit)
         self.session.flush()

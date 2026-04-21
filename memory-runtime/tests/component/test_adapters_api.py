@@ -533,6 +533,133 @@ class AdaptersApiContractRegressionTests(AdaptersApiTests):
         self.assertTrue(all(item["resource_kind"] == "episode" for item in listed_results))
         self.assertTrue(any("worker backoff window" in item["memory"] for item in listed_results))
 
+    def test_openclaw_review_memory_updates_and_marks_incorrect_for_durable_memory(self) -> None:
+        event = self.client.post(
+            "/v1/adapters/openclaw/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.openclaw_agent_id,
+                "event_type": "architecture_decision",
+                "space_hint": "project-space",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": "The runtime provider supports bootstrap and recall flows.",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(event.status_code, 201)
+        processed = WorkerRunner.run_pending_jobs()
+        self.assertGreaterEqual(processed, 1)
+
+        listed = self.client.get(
+            f"/v1/adapters/openclaw/memories?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        memory_id = next(
+            item["id"]
+            for item in listed.json()["results"]
+            if item["resource_kind"] == "memory_unit" and "bootstrap and recall" in item["memory"]
+        )
+
+        updated = self.client.patch(
+            f"/v1/adapters/openclaw/memories/{memory_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}",
+            json={
+                "content": "The runtime provider supports bootstrap, recall, and review flows.",
+                "reason": "Clarify that review is part of the contract.",
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertIn("bootstrap, recall, and review", updated.json()["memory"])
+        self.assertEqual(updated.json()["metadata"]["status"], "active")
+
+        fetched = self.client.get(
+            f"/v1/adapters/openclaw/memories/{memory_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        self.assertEqual(fetched.status_code, 200)
+        self.assertIn("bootstrap, recall, and review", fetched.json()["memory"])
+
+        search = self.client.post(
+            "/v1/adapters/openclaw/search",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.openclaw_agent_id,
+                "query": "Which provider flows include review?",
+                "limit": 5,
+            },
+        )
+        self.assertEqual(search.status_code, 200)
+        self.assertTrue(any("bootstrap, recall, and review" in item["memory"] for item in search.json()["results"]))
+
+        marked = self.client.patch(
+            f"/v1/adapters/openclaw/memories/{memory_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}",
+            json={
+                "mark_incorrect": True,
+                "reason": "This contract note is outdated.",
+            },
+        )
+        self.assertEqual(marked.status_code, 200)
+        self.assertEqual(marked.json()["metadata"]["status"], "incorrect")
+
+        missing = self.client.get(
+            f"/v1/adapters/openclaw/memories/{memory_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        self.assertEqual(missing.status_code, 404)
+
+        relisted = self.client.get(
+            f"/v1/adapters/openclaw/memories?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        self.assertFalse(any(item["id"] == memory_id for item in relisted.json()["results"]))
+
+    def test_openclaw_review_memory_updates_and_marks_incorrect_for_session_episode(self) -> None:
+        event = self.client.post(
+            "/v1/adapters/openclaw/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.openclaw_agent_id,
+                "session_id": "run_oc_review_session",
+                "event_type": "conversation_turn",
+                "space_hint": "session-space",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": "Session scratchpad: compare Redis retry windows before rollout.",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(event.status_code, 201)
+        episode_id = event.json()["event"]["episode_id"]
+
+        updated = self.client.patch(
+            f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}",
+            json={
+                "content": "Session scratchpad: compare Redis and Postgres retry windows before rollout.",
+                "reason": "Keep the scratchpad aligned with the latest experiment.",
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["resource_kind"], "episode")
+        self.assertIn("Redis and Postgres retry windows", updated.json()["memory"])
+
+        fetched = self.client.get(
+            f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        self.assertEqual(fetched.status_code, 200)
+        self.assertIn("Redis and Postgres retry windows", fetched.json()["memory"])
+
+        marked = self.client.patch(
+            f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}",
+            json={"mark_incorrect": True, "reason": "Scratchpad note should be dropped."},
+        )
+        self.assertEqual(marked.status_code, 200)
+        self.assertEqual(marked.json()["metadata"]["status"], "incorrect")
+
+        missing = self.client.get(
+            f"/v1/adapters/openclaw/memories/{episode_id}?namespace_id={self.namespace_id}&agent_id={self.openclaw_agent_id}"
+        )
+        self.assertEqual(missing.status_code, 404)
+
     def test_long_term_search_and_list_exclude_session_memory_and_deduplicate_consolidated_episodes(self) -> None:
         self.client.post(
             "/v1/adapters/openclaw/events",

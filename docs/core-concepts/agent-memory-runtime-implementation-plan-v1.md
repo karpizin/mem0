@@ -314,6 +314,7 @@
   - `POST /v1/adapters/openclaw/search`
   - `GET /v1/adapters/openclaw/memories`
   - `GET /v1/adapters/openclaw/memories/{id}`
+  - `PATCH /v1/adapters/openclaw/memories/{id}`
   - `DELETE /v1/adapters/openclaw/memories/{id}`
 - bootstrap автоматически создает или переиспользует isolated namespace, агента и default spaces
 - OpenClaw получает стабильные runtime ids и может работать с session и long-term memories через единый provider
@@ -331,7 +332,7 @@
 Подтверждение:
 
 - `OpenClaw` умеет работать через `memory-runtime`, а не только напрямую через Mem0 Cloud/OSS
-- adapter contract закрывает bootstrap, search, list, get и delete memory flows
+- adapter contract закрывает bootstrap, search, list, get, review и delete memory flows
 - long-term `search/list` больше не протаскивают `session-space` и не дублируют уже консолидированные эпизоды
 - provider lazy-bootstraps namespace/agent scope и кэширует его в runtime path
 - Python component tests и TypeScript tests проходят

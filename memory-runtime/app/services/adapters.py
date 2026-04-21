@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.repositories.agents import AgentRepository
+from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.episodes import EpisodeRepository
 from app.repositories.memory_spaces import MemorySpaceRepository
 from app.repositories.memory_units import MemoryUnitRepository
@@ -16,6 +17,7 @@ from app.schemas.adapters import (
     AdapterEventCreate,
     AdapterEventRead,
     AdapterMemoryRead,
+    AdapterMemoryReviewRequest,
     AdapterMemorySearchRequest,
     AdapterMemorySearchResponse,
     AdapterRecallRequest,
@@ -23,6 +25,7 @@ from app.schemas.adapters import (
 )
 from app.schemas.event import EventCreate
 from app.schemas.recall import RecallRequest
+from app.services.consolidation import ConsolidationService
 from app.services.ingestion import IngestionService
 from app.services.retrieval import RetrievalCandidate, RetrievalService
 
@@ -48,6 +51,7 @@ class AdapterService:
         self.namespaces = NamespaceRepository(session)
         self.agents = AgentRepository(session)
         self.spaces = MemorySpaceRepository(session)
+        self.audit_logs = AuditLogRepository(session)
         self.episodes = EpisodeRepository(session)
         self.memory_units = MemoryUnitRepository(session)
         self.ingestion = IngestionService(session)
@@ -307,6 +311,154 @@ class AdapterService:
             return
         raise LookupError(f"Memory '{memory_id}' not found")
 
+    def review_memory(
+        self,
+        *,
+        adapter_name: str,
+        namespace_id: str,
+        agent_id: str | None,
+        memory_id: str,
+        payload: AdapterMemoryReviewRequest,
+    ) -> AdapterMemoryRead:
+        self._validate_adapter_context(
+            adapter_name=adapter_name,
+            namespace_id=namespace_id,
+            agent_id=agent_id,
+        )
+
+        memory_row = self.memory_units.get_with_space(memory_id)
+        if memory_row is not None:
+            memory, space_type = memory_row
+            if memory.namespace_id != namespace_id or (agent_id is not None and memory.agent_id not in {None, agent_id}):
+                raise LookupError(f"Memory '{memory_id}' not found")
+            if memory.status != "active":
+                raise LookupError(f"Memory '{memory_id}' not found")
+            if payload.mark_incorrect:
+                self.memory_units.mark_incorrect(memory)
+                self.audit_logs.create(
+                    namespace_id=namespace_id,
+                    agent_id=agent_id,
+                    entity_type="memory_unit",
+                    entity_id=memory.id,
+                    action="memory_review_marked_incorrect",
+                    details_json={
+                        "resource_kind": "memory_unit",
+                        "space_type": space_type,
+                        "status_from": "active",
+                        "status_to": "incorrect",
+                        "reason": payload.reason,
+                    },
+                )
+                self.session.commit()
+                return self._memory_read_from_candidate(
+                    _AdapterMemoryCandidate(
+                        id=memory.id,
+                        resource_kind="memory_unit",
+                        space_type=space_type,
+                        memory=memory.content,
+                        summary=memory.summary,
+                        score=None,
+                        created_at=memory.created_at,
+                        updated_at=memory.updated_at,
+                        metadata={
+                            "space_type": space_type,
+                            "kind": memory.kind,
+                            "scope": memory.scope,
+                            "status": "incorrect",
+                            "sensitive": memory.is_sensitive,
+                            "sensitivity_reason": memory.sensitivity_reason,
+                            "masked": memory.is_sensitive and should_mask_sensitive_outputs(),
+                        },
+                        is_sensitive=memory.is_sensitive,
+                        sensitivity_reason=memory.sensitivity_reason,
+                    )
+                )
+
+            updated_content = payload.content.strip()
+            sensitivity_reason = detect_sensitive_reason(updated_content)
+            updated_memory = self.memory_units.update_content(
+                memory,
+                content=updated_content,
+                summary=self._summarize_review_content(updated_content, resource_kind="memory_unit"),
+                merge_key=ConsolidationService.normalize_merge_key(updated_content),
+                is_sensitive=sensitivity_reason is not None,
+                sensitivity_reason=sensitivity_reason,
+            )
+            self.audit_logs.create(
+                namespace_id=namespace_id,
+                agent_id=agent_id,
+                entity_type="memory_unit",
+                entity_id=updated_memory.id,
+                action="memory_review_updated",
+                details_json={
+                    "resource_kind": "memory_unit",
+                    "space_type": space_type,
+                    "reason": payload.reason,
+                    "sensitive": sensitivity_reason is not None,
+                    "sensitivity_reason": sensitivity_reason,
+                },
+            )
+            self.session.commit()
+            return self._memory_read_from_candidate(
+                self._memory_unit_candidate(updated_memory, space_type=space_type)
+            )
+
+        episode = self.episodes.get_by_id(memory_id)
+        if episode is not None and episode.namespace_id == namespace_id:
+            if agent_id is not None and episode.agent_id not in {None, agent_id}:
+                raise LookupError(f"Memory '{memory_id}' not found")
+            space = self.spaces.get_by_id(episode.space_id) if episode.space_id else None
+            space_type = space.space_type if space is not None else "session-space"
+            if payload.mark_incorrect:
+                candidate = self._episode_candidate(episode=episode, space_type=space_type)
+                self.audit_logs.create(
+                    namespace_id=namespace_id,
+                    agent_id=agent_id,
+                    entity_type="episode",
+                    entity_id=episode.id,
+                    action="memory_review_marked_incorrect",
+                    details_json={
+                        "resource_kind": "episode",
+                        "space_type": space_type,
+                        "status_to": "deleted",
+                        "reason": payload.reason,
+                    },
+                )
+                self.episodes.delete(episode)
+                self.session.commit()
+                candidate.metadata = {
+                    **candidate.metadata,
+                    "status": "incorrect",
+                }
+                return self._memory_read_from_candidate(candidate)
+
+            updated_content = payload.content.strip()
+            updated_episode = self.episodes.update_content(
+                episode,
+                raw_text=updated_content,
+                summary=self._summarize_review_content(updated_content, resource_kind="episode"),
+                token_count=len(updated_content.split()),
+            )
+            self.audit_logs.create(
+                namespace_id=namespace_id,
+                agent_id=agent_id,
+                entity_type="episode",
+                entity_id=updated_episode.id,
+                action="memory_review_updated",
+                details_json={
+                    "resource_kind": "episode",
+                    "space_type": space_type,
+                    "reason": payload.reason,
+                    "sensitive": detect_sensitive_reason(updated_content) is not None,
+                },
+            )
+            self.session.commit()
+            return self._memory_read_from_candidate(
+                self._episode_candidate(episode=updated_episode, space_type=space_type)
+            )
+
+        raise LookupError(f"Memory '{memory_id}' not found")
+
     def _validate_adapter_context(self, *, adapter_name: str, namespace_id: str, agent_id: str | None) -> None:
         namespace = self.namespaces.get_by_id(namespace_id)
         if namespace is None:
@@ -383,27 +535,12 @@ class AdapterService:
         memory_row = self.memory_units.get_with_space(memory_id)
         if memory_row is not None:
             memory, space_type = memory_row
-            if memory.namespace_id == namespace_id and (agent_id is None or memory.agent_id in {None, agent_id}):
-                return _AdapterMemoryCandidate(
-                    id=memory.id,
-                    resource_kind="memory_unit",
-                    space_type=space_type,
-                    memory=memory.content,
-                    summary=memory.summary,
-                    score=None,
-                    created_at=memory.created_at,
-                    updated_at=memory.updated_at,
-                    metadata={
-                        "space_type": space_type,
-                        "kind": memory.kind,
-                        "scope": memory.scope,
-                        "sensitive": memory.is_sensitive,
-                        "sensitivity_reason": memory.sensitivity_reason,
-                        "masked": memory.is_sensitive and should_mask_sensitive_outputs(),
-                    },
-                    is_sensitive=memory.is_sensitive,
-                    sensitivity_reason=memory.sensitivity_reason,
-                )
+            if (
+                memory.namespace_id == namespace_id
+                and memory.status == "active"
+                and (agent_id is None or memory.agent_id in {None, agent_id})
+            ):
+                return self._memory_unit_candidate(memory, space_type=space_type)
 
         episode = self.episodes.get_by_id(memory_id)
         if episode is None or episode.namespace_id != namespace_id:
@@ -413,6 +550,30 @@ class AdapterService:
         space = self.spaces.get_by_id(episode.space_id) if episode.space_id else None
         space_type = space.space_type if space is not None else "session-space"
         return self._episode_candidate(episode=episode, space_type=space_type)
+
+    @staticmethod
+    def _memory_unit_candidate(memory, *, space_type: str) -> _AdapterMemoryCandidate:
+        return _AdapterMemoryCandidate(
+            id=memory.id,
+            resource_kind="memory_unit",
+            space_type=space_type,
+            memory=memory.content,
+            summary=memory.summary,
+            score=None,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+            metadata={
+                "space_type": space_type,
+                "kind": memory.kind,
+                "scope": memory.scope,
+                "status": memory.status,
+                "sensitive": memory.is_sensitive,
+                "sensitivity_reason": memory.sensitivity_reason,
+                "masked": memory.is_sensitive and should_mask_sensitive_outputs(),
+            },
+            is_sensitive=memory.is_sensitive,
+            sensitivity_reason=memory.sensitivity_reason,
+        )
 
     @staticmethod
     def _episode_candidate(*, episode, space_type: str) -> _AdapterMemoryCandidate:
@@ -430,6 +591,7 @@ class AdapterService:
             metadata={
                 "session_id": episode.session_id,
                 "space_type": space_type,
+                "status": "active",
                 "sensitive": is_sensitive,
                 "sensitivity_reason": sensitivity_reason,
                 "masked": is_sensitive and should_mask_sensitive_outputs(),
@@ -445,6 +607,27 @@ class AdapterService:
             is_sensitive=candidate.is_sensitive,
             masked=candidate.is_sensitive and should_mask_sensitive_outputs(),
         )
+
+    def _memory_read_from_candidate(self, candidate: _AdapterMemoryCandidate) -> AdapterMemoryRead:
+        return AdapterMemoryRead(
+            id=candidate.id,
+            memory=self._display_memory(candidate),
+            resource_kind=candidate.resource_kind,
+            space_type=candidate.space_type,
+            score=candidate.score,
+            created_at=candidate.created_at,
+            updated_at=candidate.updated_at,
+            metadata=candidate.metadata,
+        )
+
+    @staticmethod
+    def _summarize_review_content(content: str, *, resource_kind: str) -> str:
+        normalized = content.strip()
+        truncated = normalized[:120]
+        if len(normalized) > 120:
+            truncated += "..."
+        prefix = "memory_unit" if resource_kind == "memory_unit" else "conversation_turn"
+        return f"{prefix}: {truncated}"
 
     @staticmethod
     def _score_candidate(

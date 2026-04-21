@@ -10,6 +10,7 @@ from app.schemas.adapters import (
     AdapterEventCreate,
     AdapterEventRead,
     AdapterMemoryRead,
+    AdapterMemoryReviewRequest,
     AdapterMemorySearchRequest,
     AdapterMemorySearchResponse,
     AdapterRecallRequest,
@@ -136,6 +137,29 @@ def openclaw_delete_memory(
             namespace_id=namespace_id,
             agent_id=agent_id,
             memory_id=memory_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/openclaw/memories/{memory_id}", response_model=AdapterMemoryRead)
+def openclaw_review_memory(
+    memory_id: str,
+    payload: AdapterMemoryReviewRequest,
+    namespace_id: str = Query(...),
+    agent_id: str | None = Query(default=None),
+    db: Session = Depends(get_db_session),
+) -> AdapterMemoryRead:
+    service = AdapterService(db)
+    try:
+        return service.review_memory(
+            adapter_name="openclaw",
+            namespace_id=namespace_id,
+            agent_id=agent_id,
+            memory_id=memory_id,
+            payload=payload,
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

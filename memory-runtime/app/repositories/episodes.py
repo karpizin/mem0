@@ -164,6 +164,20 @@ class EpisodeRepository:
         )
         return self.session.execute(stmt).scalar_one_or_none()
 
+    def update_content(
+        self,
+        episode: Episode,
+        *,
+        raw_text: str,
+        summary: str,
+        token_count: int,
+    ) -> Episode:
+        episode.raw_text = raw_text
+        episode.summary = summary
+        episode.token_count = token_count
+        self.session.flush()
+        return episode
+
     def delete(self, episode: Episode) -> None:
         self.session.delete(episode)
         self.session.flush()

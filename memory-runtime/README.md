@@ -126,6 +126,7 @@ Readiness baseline теперь включает:
 - `POST /v1/adapters/openclaw/search`
 - `GET /v1/adapters/openclaw/memories`
 - `GET /v1/adapters/openclaw/memories/{memory_id}`
+- `PATCH /v1/adapters/openclaw/memories/{memory_id}`
 - `DELETE /v1/adapters/openclaw/memories/{memory_id}`
 - `POST /v1/adapters/bunkerai/events`
 - `POST /v1/adapters/bunkerai/recall`
@@ -133,6 +134,8 @@ Readiness baseline теперь включает:
 Адаптерные endpoints фиксируют source-system contract для интеграций и работают поверх того же ingestion/recall pipeline.
 Для `OpenClaw` добавлен отдельный runtime-contract: плагин сначала вызывает `bootstrap`, затем использует `events/search/list/get/delete` как transport-поверхность вместо прямого подключения к `mem0`.
 Long-term `search/list` в adapter contract теперь возвращают только durable `memory_units` и не подтягивают `session-space` или raw `episode` noise; session-scoped `episode` candidates доступны только при явном `session_id`, а уже консолидированные эпизоды не дублируются рядом с `memory_units`.
+
+`PATCH /v1/adapters/openclaw/memories/{memory_id}` закрывает минимальный review-surface для `OpenClaw`: durable `memory_units` и session `episodes` можно обновлять, а `mark_incorrect` мягко убирает durable memory из active recall/list/search или удаляет session scratchpad из текущего session-surface.
 Consolidation baseline теперь умеет:
 - повышать decision-like `conversation_turn` до `decision`
 - повышать procedural guidance до `procedure`
@@ -208,7 +211,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - low-trust consolidation rejection for prompt-like long-term poisoning attempts
 - lifecycle jobs, decay/archive/eviction baseline, and internal metrics counters
 - adapter contracts for `OpenClaw` and `BunkerAI`
-- OpenClaw runtime adapter coverage for bootstrap, search, list, get, and delete
+- OpenClaw runtime adapter coverage for bootstrap, search, list, get, review, and delete
 - shared namespace e2e scenario for cross-agent memory exchange
 - OpenClaw pilot e2e continuity flow
 - Prometheus-style metrics exporter and observability stats endpoint
