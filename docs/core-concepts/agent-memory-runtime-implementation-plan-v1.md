@@ -256,6 +256,7 @@
 - для trend analysis теперь есть отдельный baseline на `3000` memories
 - отдельно зафиксирована методологическая проверка `in-process` vs `real local HTTP runtime`, чтобы не путать алгоритмическую скорость памяти со скоростью полного сервисного контура
 - live verification также показала важный operational нюанс: для тяжелых `3000`-memory ingestion/load прогонов `SQLite` уже перестает быть хорошим production proxy из-за `database is locked`; следующий реалистичный benchmark layer должен идти через `Postgres`
+- после перехода на `real local HTTP + Postgres` оказалось, что сам recall-path там уже быстрее и правдоподобнее, чем `in-process + SQLite`, а главным realism-сигналом становится не recall latency, а величина фонового backlog после массовой подготовки benchmark-пула
 
 ### Статус `Phase H`
 

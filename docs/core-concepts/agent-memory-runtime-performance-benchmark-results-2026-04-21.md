@@ -203,6 +203,87 @@ To get closer to production reality, the next benchmark layer should be:
 - backed by `Postgres`, not `SQLite`
 - with the same `500 / 1000 / 3000` trend points
 
+## Real Local HTTP + Postgres Validation
+
+The next realism pass was then run against a real local runtime backed by Postgres instead of SQLite:
+
+- local `uvicorn` on `127.0.0.1:8098`
+- separate local worker process
+- shared Docker Postgres on `127.0.0.1:5433`
+- `balanced_runtime`
+- `8` concurrent recall workers
+- `3` rounds
+- memory counts: `1000`, `3000`
+
+This pass also surfaced and fixed a genuine production issue before the benchmark could run:
+
+- migration `0005_sensitive_mem` used `0` instead of a proper boolean expression for `is_sensitive`
+- SQLite tolerated that path, Postgres did not
+- after fixing the migration, the Postgres-backed run completed successfully
+
+### Remote Postgres Results
+
+| Memories | Throughput | Avg latency | P95 latency | `candidate_fetch` | `feedback_lookup` | `audit_record` | Failures |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `1000` | `41.8252 rps` | `169.7917ms` | `196ms` | `58.2083ms` | `11.3333ms` | `16.2083ms` | `0` |
+| `3000` | `34.1456 rps` | `206.9167ms` | `237ms` | `108.0417ms` | `9.875ms` | `13.375ms` | `0` |
+
+### In-Process vs Real Postgres Recall
+
+| Memories | Mode | Throughput | Avg latency | P95 latency |
+| --- | --- | ---: | ---: | ---: |
+| `1000` | `in_process + SQLite` | `24.6868 rps` | `305.275ms` | `322ms` |
+| `1000` | `real HTTP + Postgres` | `41.8252 rps` | `169.7917ms` | `196ms` |
+| `3000` | `in_process + SQLite` | `11.9971 rps` | `651.175ms` | `687ms` |
+| `3000` | `real HTTP + Postgres` | `34.1456 rps` | `206.9167ms` | `237ms` |
+
+### Interpretation
+
+- the earlier realism concern was correct in one important way:
+  - `SQLite` was a bad proxy for the heavier benchmark contour
+- but the refined conclusion is now more nuanced:
+  - for the recall path itself, real Postgres-backed performance is materially better than the `in-process + SQLite` baseline
+  - for the full service contour, the benchmark setup cost is much more realistic and much heavier
+
+The strongest evidence for that second point is the live runtime state during the benchmark:
+
+- recall completed successfully with `0` failures
+- `50` recall requests were served
+- but the background system was still carrying a very large job backlog after the run:
+  - `3592` pending jobs
+  - `6534` completed jobs
+
+So the new reality model is:
+
+- `in_process + SQLite`
+  - good for algorithmic trend detection
+  - pessimistic for modern capped recall query performance
+  - unrealistic for service-level ingestion/job pressure
+- `real HTTP + Postgres`
+  - better approximation of recall latency in a production-like storage engine
+  - much better approximation of setup cost, lifecycle pressure, and background job accumulation
+
+### Updated Production-Oriented Conclusion
+
+Our current benchmark stack is now good enough to answer two different questions:
+
+1. `Did a recall optimization help?`
+   - use `in-process` for quick, stable regression detection
+2. `What does a more realistic local contour look like?`
+   - use `real HTTP + Postgres`
+
+The main remaining realism gap is no longer the recall request itself. It is the surrounding operational contour:
+
+- ingestion burst cost
+- consolidation backlog
+- lifecycle backlog
+- long-running worker drain behavior
+
+That makes the next performance/scalability frontier much clearer:
+
+- keep using `in-process` for rapid optimization loops
+- use `real HTTP + Postgres` to track backlog pressure and end-to-end operational cost
+
 ## Soak Benchmark
 
 To measure repeated-recall stability on large memory pools, an additional soak benchmark was run on the `balanced_runtime` scenario.

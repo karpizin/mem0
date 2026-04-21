@@ -21,7 +21,15 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("is_sensitive", sa.Boolean(), nullable=True))
         batch_op.add_column(sa.Column("sensitivity_reason", sa.String(length=100), nullable=True))
 
-    op.execute("UPDATE memory_units SET is_sensitive = 0 WHERE is_sensitive IS NULL")
+    memory_units = sa.table(
+        "memory_units",
+        sa.column("is_sensitive", sa.Boolean()),
+    )
+    op.execute(
+        memory_units.update()
+        .where(memory_units.c.is_sensitive.is_(None))
+        .values(is_sensitive=sa.false())
+    )
 
     with op.batch_alter_table("memory_units") as batch_op:
         batch_op.alter_column("is_sensitive", existing_type=sa.Boolean(), nullable=False)
