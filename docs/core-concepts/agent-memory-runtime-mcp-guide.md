@@ -662,7 +662,28 @@ Guardrails:
 9. сохраняет артефакты в `.artifacts/pilot_traces/mcp-smoke/...`
 10. сохраняет компактный отчет в `.artifacts/openclaw_mcp_smoke_report.json`
 
-## 16. Текущий статус
+## 16. Client Examples
+
+Готовый examples pack лежит здесь:
+
+- [examples/mcp-memory-runtime](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime)
+
+Что внутри:
+
+- [README.md](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime/README.md)
+- [curl_smoke.sh](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime/curl_smoke.sh)
+- [python_client.py](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime/python_client.py)
+- [typescript_client.mjs](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime/typescript_client.mjs)
+
+Все примеры показывают один и тот же guarded flow:
+
+1. `initialize`
+2. `tools/list`
+3. `memory.ingest_event`
+4. `memory.recall`
+5. `memory.record_feedback`
+
+## 17. Текущий статус
 
 Текущая реализация уже покрыта component tests:
 
@@ -675,6 +696,7 @@ Guardrails:
 - shared-space write без `agent_id`
 - изоляция private `project-space` memory между агентами в shared namespace
 - guardrail на `session_id + agent-core` для `memory.ingest_event`
+- готовый examples pack для `curl`, `Python` и `TypeScript`
 
 Текущий рабочий baseline:
 

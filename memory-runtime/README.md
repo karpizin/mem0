@@ -158,6 +158,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - client_name
 - latency buckets для MCP requests и tool calls
 Для быстрой живой проверки MCP write/read loop есть `make mcp-smoke`, который выполняет `initialize -> tools/list -> memory.ingest_event -> memory.recall -> memory.record_feedback` и сохраняет отчет в `.artifacts/openclaw_mcp_smoke_report.json`.
+Для быстрого старта интеграций есть готовый examples pack: [examples/mcp-memory-runtime](/Users/slava/Documents/mem0-src/examples/mcp-memory-runtime).
 
 ## Тесты
 
