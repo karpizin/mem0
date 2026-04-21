@@ -152,6 +152,7 @@ Worker-derived operational counters (`jobs_*`, `consolidation_*`, `lifecycle_*`)
 Для ресурса `latest agent brief` runtime сохраняет `recall_executed` entries в `audit_log`, чтобы MCP-клиенты могли читать последний recall без отдельного кеша.
 Safe write tools идут только через существующие runtime paths: `memory.ingest_event` использует обычный ingestion pipeline, а `memory.record_feedback` использует существующий recall feedback path.
 MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_calls_total`, `mcp_resource_reads_total`, `mcp_prompt_requests_total`, `mcp_errors_total`) экспортируются через `/metrics`.
+Для быстрой живой проверки MCP write/read loop есть `make mcp-smoke`, который выполняет `initialize -> tools/list -> memory.ingest_event -> memory.recall -> memory.record_feedback` и сохраняет отчет в `.artifacts/openclaw_mcp_smoke_report.json`.
 
 ## Тесты
 
@@ -177,6 +178,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - recall trace explainability with decisive selection signals
 - golden compactness regression for low-budget memory briefs
 - MCP Streamable HTTP facade with tools/resources/prompts contract, safe write tools, and transport validation
+- отдельный MCP smoke runner для быстрой проверки guarded write/read flow на живом контуре
 
 Команды запуска:
 

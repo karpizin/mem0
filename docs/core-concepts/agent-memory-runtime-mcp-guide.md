@@ -608,6 +608,7 @@ Guardrails:
 
 - `memory_runtime_mcp_requests_total`
 - `memory_runtime_mcp_tool_calls_total`
+- `memory_runtime_mcp_write_tool_calls_total`
 - `memory_runtime_mcp_resource_reads_total`
 - `memory_runtime_mcp_prompt_requests_total`
 - `memory_runtime_mcp_errors_total`
@@ -628,9 +629,30 @@ Guardrails:
 4. `prompts/list`
 5. использовать `memory.recall` как основной operational tool
 6. использовать `memory.search` и `memory.get_memory_unit` для debugging и inspection
-7. использовать resources для read-only context и operator workflows
+7. использовать `memory.ingest_event` и `memory.record_feedback` для guarded write workflows
+8. использовать resources для read-only context и operator workflows
 
-## 15. Текущий статус
+## 15. MCP Smoke Flow
+
+Для быстрой живой проверки MCP surface теперь есть отдельный smoke flow:
+
+- `cd /Users/slava/Documents/mem0-src/memory-runtime`
+- `make mcp-smoke`
+
+Что он делает:
+
+1. поднимает локальный compose-контур
+2. создает isolated namespace и agent
+3. выполняет `initialize`
+4. выполняет `tools/list`
+5. пишет событие через `memory.ingest_event`
+6. ждет обработки jobs
+7. вызывает `memory.recall`
+8. записывает positive feedback через `memory.record_feedback`
+9. сохраняет артефакты в `.artifacts/pilot_traces/mcp-smoke/...`
+10. сохраняет компактный отчет в `.artifacts/openclaw_mcp_smoke_report.json`
+
+## 16. Текущий статус
 
 Текущая реализация уже покрыта component tests:
 
@@ -639,9 +661,11 @@ Guardrails:
 - resource reads
 - prompt responses
 - metrics export
+- MCP smoke runner для safe write/read flow
 
 Текущий рабочий baseline:
 
 - пригоден для MCP-aware read-first интеграций
+- пригоден для guarded write/read smoke через `memory.ingest_event` и `memory.record_feedback`
 - не заменяет REST adapters
 - хорошо подходит как compatibility layer и inspection surface

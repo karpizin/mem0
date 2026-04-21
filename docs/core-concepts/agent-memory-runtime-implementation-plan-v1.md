@@ -1159,7 +1159,12 @@ Definition of Done:
 
 - более глубокие namespace isolation/shared-space edge cases через MCP
 - optional дополнительные транспорты поверх того же thin facade, если это реально потребуется интеграциям
-- маленький MCP client smoke script для быстрого подключения и проверки реального `OpenClaw`
+- углубление smoke/eval сценариев для MCP surface по мере появления новых интеграций
+
+Дополнительно реализовано:
+
+- `make mcp-smoke` проверяет `initialize -> tools/list -> memory.ingest_event -> memory.recall -> memory.record_feedback`
+- smoke flow сохраняет trace artifacts и компактный JSON report для операторской диагностики
 
 Связанный артефакт:
 
