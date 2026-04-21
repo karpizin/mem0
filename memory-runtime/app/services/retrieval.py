@@ -94,6 +94,14 @@ class RetrievalCandidate:
     usefulness_score: float = 0.0
     is_sensitive: bool = False
     sensitivity_reason: str | None = None
+    search_tokens: frozenset[str] = frozenset()
+    recency_score: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.search_tokens:
+            self.search_tokens = frozenset(RetrievalService._normalize_tokens(f"{self.summary} {self.raw_text}"))
+        if self.recency_score is None:
+            self.recency_score = RetrievalService._recency_score(self.created_at)
 
 
 class RetrievalService:
@@ -221,6 +229,7 @@ class RetrievalService:
         feedback_scores: dict[str, float],
     ) -> RetrievalCandidate:
         sensitivity_reason = detect_sensitive_reason(episode.raw_text)
+        search_tokens = frozenset(cls._normalize_tokens(f"{episode.summary} {episode.raw_text}"))
         return RetrievalCandidate(
             episode_id=episode.id,
             space_type=space_type,
@@ -233,6 +242,8 @@ class RetrievalService:
             usefulness_score=feedback_scores.get(episode.id, 0.0),
             is_sensitive=sensitivity_reason is not None,
             sensitivity_reason=sensitivity_reason,
+            search_tokens=search_tokens,
+            recency_score=cls._recency_score(episode.created_at),
         )
 
     def record_feedback(self, payload: RecallFeedbackRequest) -> RecallFeedbackResponse:
@@ -284,9 +295,10 @@ class RetrievalService:
         candidates: list[RetrievalCandidate],
         active_session_id: str | None = None,
     ) -> list[RetrievalCandidate]:
+        query_tokens = cls._normalize_tokens(query)
         return sorted(
             candidates,
-            key=lambda candidate: cls._score_candidate(query, candidate, active_session_id),
+            key=lambda candidate: cls._score_candidate(query_tokens, candidate, active_session_id),
             reverse=True,
         )
 
@@ -303,18 +315,18 @@ class RetrievalService:
             return []
 
         max_items = max(3, min(8, context_budget_tokens // 250))
-        top_score, _recency = cls._score_candidate(query, ranked_candidates[0], active_session_id)
+        query_tokens = cls._normalize_tokens(query)
+        top_score, _recency = cls._score_candidate(query_tokens, ranked_candidates[0], active_session_id)
         min_score = max(1.25, top_score * 0.22)
         slot_counts = {slot: 0 for slot in MAX_ITEMS_BY_SLOT}
         selected: list[RetrievalCandidate] = []
-        query_tokens = cls._normalize_tokens(query)
         explicit_session_intent = bool(query_tokens & SESSION_INTENT_TOKENS)
         long_term_intent = bool(query_tokens & LONG_TERM_INTENT_TOKENS)
         integration_intent = bool(query_tokens & INTEGRATION_INTENT_TOKENS)
         primary_runtime_intent = bool(query_tokens & PRIMARY_RUNTIME_INTENT_TOKENS)
 
         for candidate in ranked_candidates:
-            score, _recency = cls._score_candidate(query, candidate, active_session_id)
+            score, _recency = cls._score_candidate(query_tokens, candidate, active_session_id)
             slot = cls._slot_for_candidate(candidate)
             if (
                 candidate.space_type == "session-space"
@@ -339,11 +351,10 @@ class RetrievalService:
                 slot = cls._slot_for_candidate(candidate)
                 if slot != "active_project_context" or slot_counts[slot] >= MAX_ITEMS_BY_SLOT[slot]:
                     continue
-                score, _recency = cls._score_candidate(query, candidate, active_session_id)
+                score, _recency = cls._score_candidate(query_tokens, candidate, active_session_id)
                 if score < 1.0:
                     continue
-                candidate_tokens = cls._normalize_tokens(f"{candidate.summary} {candidate.raw_text}")
-                if candidate_tokens & SCRATCH_TOKENS:
+                if candidate.search_tokens & SCRATCH_TOKENS:
                     continue
                 selected.append(candidate)
                 slot_counts[slot] += 1
@@ -398,9 +409,10 @@ class RetrievalService:
         *,
         active_session_id: str | None,
     ) -> list[RecallSelectionExplanation]:
+        query_tokens = cls._normalize_tokens(query)
         explanations: list[RecallSelectionExplanation] = []
         for candidate in ranked_candidates:
-            components = cls._score_components(query, candidate, active_session_id)
+            components = cls._score_components(query_tokens, candidate, active_session_id)
             decisive_signal = cls._decisive_signal(components)
             slot = cls._slot_for_candidate(candidate)
             explanations.append(
@@ -454,11 +466,9 @@ class RetrievalService:
         }
 
     @classmethod
-    def _token_overlap(cls, query: str, text: str) -> float:
-        query_tokens = cls._normalize_tokens(query)
+    def _token_overlap(cls, query_tokens: set[str], text_tokens: frozenset[str]) -> float:
         if not query_tokens:
             return 0.0
-        text_tokens = cls._normalize_tokens(text)
         if not text_tokens:
             return 0.0
         return len(query_tokens & text_tokens) / len(query_tokens)
@@ -480,11 +490,11 @@ class RetrievalService:
     @classmethod
     def _score_candidate(
         cls,
-        query: str,
+        query_tokens: set[str],
         candidate: RetrievalCandidate,
         active_session_id: str | None,
     ) -> tuple[float, float]:
-        components = cls._score_components(query, candidate, active_session_id)
+        components = cls._score_components(query_tokens, candidate, active_session_id)
         total = sum(components.values())
         recency = components["recency"]
         return total, recency
@@ -492,14 +502,13 @@ class RetrievalService:
     @classmethod
     def _score_components(
         cls,
-        query: str,
+        query_tokens: set[str],
         candidate: RetrievalCandidate,
         active_session_id: str | None,
     ) -> dict[str, float]:
-        query_tokens = cls._normalize_tokens(query)
-        overlap = cls._token_overlap(query, f"{candidate.summary} {candidate.raw_text}")
+        overlap = cls._token_overlap(query_tokens, candidate.search_tokens)
         importance = {"high": 2.0, "medium": 1.0, "normal": 0.0}.get(candidate.importance_hint, 0.0)
-        recency = cls._recency_score(candidate.created_at)
+        recency = candidate.recency_score
         usefulness = candidate.usefulness_score * 3.0
 
         session_boost = 0.0
@@ -547,11 +556,11 @@ class RetrievalService:
 
         storage_boost = 0.0
         if primary_runtime_intent and candidate.space_type in {"project-space", "shared-space"}:
-            if candidate_tokens & INFRASTRUCTURE_TOKENS:
+            if candidate.search_tokens & INFRASTRUCTURE_TOKENS:
                 storage_boost += 2.0
-            if candidate_tokens & SCRATCH_TOKENS:
+            if candidate.search_tokens & SCRATCH_TOKENS:
                 storage_boost -= 5.0
-            if {"not", "primary"} <= candidate_tokens:
+            if {"not", "primary"} <= candidate.search_tokens:
                 storage_boost -= 2.0
 
         return {
@@ -625,6 +634,7 @@ class RetrievalService:
     def _candidate_from_external_result(result: ExternalMemoryResult) -> RetrievalCandidate:
         content = result.content.strip()
         summary = f"external_memory: {content}"
+        search_tokens = frozenset(RetrievalService._normalize_tokens(f"{summary} {content}"))
         return RetrievalCandidate(
             episode_id=f"mem0:{result.external_id}",
             space_type=result.space_type,
@@ -637,4 +647,6 @@ class RetrievalService:
             usefulness_score=0.0,
             is_sensitive=False,
             sensitivity_reason=None,
+            search_tokens=search_tokens,
+            recency_score=1.0,
         )

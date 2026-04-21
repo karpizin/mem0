@@ -452,11 +452,5 @@ class AdapterService:
         candidate: RetrievalCandidate,
         session_id: str | None,
     ) -> tuple[float, float]:
-        ranked = RetrievalService.rank_candidates(query, [candidate], session_id)
-        selected = ranked[0]
-        overlap = RetrievalService._token_overlap(query, f"{selected.summary} {selected.raw_text}")
-        importance = {"high": 2.0, "medium": 1.0, "normal": 0.0}.get(selected.importance_hint, 0.0)
-        session_boost = 1.0 if session_id and selected.session_id == session_id else 0.0
-        recency = RetrievalService._recency_score(selected.created_at)
-        usefulness = selected.usefulness_score * 3.0
-        return overlap * 10.0 + importance + session_boost + recency + usefulness, recency
+        query_tokens = RetrievalService._normalize_tokens(query)
+        return RetrievalService._score_candidate(query_tokens, candidate, session_id)

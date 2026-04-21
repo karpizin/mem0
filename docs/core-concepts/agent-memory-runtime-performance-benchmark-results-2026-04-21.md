@@ -166,3 +166,39 @@ The current retrieval path looks strong on three different axes:
 - `single-request scaling`: good through `1000` memories
 - `sequential soak stability`: good through `1000` memories with `0` failures
 - `concurrent recall stability`: good through `1000` memories with `0` failures, though latency under concurrency is now high enough that it should become the next optimization focus
+
+## Concurrent Recall Optimization Follow-Up
+
+After the first concurrent baseline, the retrieval hot path was tightened so that each recall request now:
+
+- computes `query_tokens` once per request instead of repeatedly
+- reuses precomputed candidate token sets
+- reuses precomputed recency scores
+- avoids several repeated normalize/tokenize passes during ranking, selection, and explanation building
+
+### Before / After
+
+| Memories | Metric | Before | After | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `500` | `avg latency` | `1074.4ms` | `913.5ms` | `-160.9ms` |
+| `500` | `p95 latency` | `1272ms` | `1110ms` | `-162ms` |
+| `500` | `throughput` | `7.346 rps` | `8.5269 rps` | `+1.1809 rps` |
+| `1000` | `avg latency` | `1865.625ms` | `1592.25ms` | `-273.375ms` |
+| `1000` | `p95 latency` | `2235ms` | `1881ms` | `-354ms` |
+| `1000` | `throughput` | `4.1443 rps` | `4.9045 rps` | `+0.7602 rps` |
+
+### Interpretation
+
+- the optimization helped meaningfully at both pool sizes without changing recall output quality
+- the gain is larger at `1000` memories, which is a good sign that repeated tokenization/scoring work was a real part of the hot path
+- concurrent recall is still the main performance pressure point, but the current path is now materially better than the first baseline
+
+### Current Performance Conclusion
+
+The runtime now shows:
+
+- `good` single-request scaling through `1000` memories
+- `good` sequential soak stability through `1000` memories with `0` failures
+- `improving but still important` concurrent recall latency under `8-way` load
+
+The next likely performance wins will come from reducing Python-side work further or lowering DB/session contention under parallel recall.
