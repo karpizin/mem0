@@ -709,6 +709,10 @@ Definition of Done:
   - `integration_mix`
   и возвращает latency/candidate/brief-size baseline по каждому профилю и overall summary
 - есть отдельный `make soak-benchmark`, который проверяет repeated-recall stability на одном крупном memory pool и измеряет failure rate, latency drift, selected-count stability и brief-size stability
+- есть отдельный `make load-benchmark`, который проверяет concurrent recall load на одном крупном memory pool и измеряет failure rate, throughput, latency distribution, selected-count stability и brief-size stability
+- первые concurrent baselines уже зафиксированы в performance report:
+  - `500 memories` / `8-way concurrency` -> `avg ~1074ms`, `p95 ~1272ms`, `0 failures`
+  - `1000 memories` / `8-way concurrency` -> `avg ~1866ms`, `p95 ~2235ms`, `0 failures`
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

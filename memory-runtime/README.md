@@ -244,6 +244,7 @@ make lifecycle-eval
 make continuity-benchmark
 make performance-benchmark
 make soak-benchmark
+make load-benchmark
 make compare-eval BEFORE=/path/to/before.json AFTER=/path/to/after.json
 make snapshot-pilot NAME=before-live
 make restore-pilot SNAPSHOT=before-live
@@ -314,6 +315,15 @@ Promotion decision layer теперь включает и первый `rescue l
 - `latency_ms` (`min / avg / p50 / p95 / max`)
 - `selected_count`
 - `brief_chars`
+`make load-benchmark ARGS="--memory-count 500 --concurrency 8 --rounds 5 --scenario balanced_runtime"` выполняет concurrent recall benchmark и возвращает:
+- `total_requests`
+- `failure_rate`
+- `throughput_rps`
+- `latency_ms` (`min / avg / p50 / p95 / max`)
+- `selected_count`
+- `brief_chars`
+По умолчанию benchmark идет в `in-process` режиме, чтобы измерять сам runtime hot path без контейнерного drift. При необходимости можно явно указать `--base-url http://127.0.0.1:8080` и прогнать ту же нагрузку против живого контейнера.
+Если benchmark запускается в `in-process` режиме против локального SQLite, лучше явно задать чистый DSN через `MEMORY_RUNTIME_POSTGRES_DSN=sqlite+pysqlite:////tmp/<name>.db MEMORY_RUNTIME_AUTO_CREATE_TABLES=true`, чтобы старые benchmark-базы не создавали schema drift.
 Дополнительно retrieval и injection теперь имеют explicit high-density regressions:
 - unit-тест на `~40` candidate memories проверяет, что brief остается релевантным и не засоряется шумом
 - legacy recall test на `120` memories проверяет, что OpenClaw все равно подмешивает только компактный top-slice в рамках budget

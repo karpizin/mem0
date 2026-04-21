@@ -127,3 +127,42 @@ This suggests the retrieval path is not only scaling reasonably by pool size, bu
 1. Optimize the benchmark harness so that full `500/1000` multi-scenario pools can complete faster.
 2. Add a true load/concurrency benchmark rather than only sequential recall measurements.
 3. After that, compare in-process benchmark numbers with live container benchmarks on the same scenario pack.
+
+## Concurrent Load Benchmark
+
+To measure concurrent recall pressure on the same large namespace, an additional load benchmark was run against the current runtime code in `in-process` mode.
+
+Configuration:
+
+- `balanced_runtime`
+- `8` concurrent recall workers
+- `5` rounds
+- `40` total recall requests per run
+
+The runs below used clean temp SQLite DSNs to avoid stale local schema drift from older benchmark databases.
+
+### Results
+
+| Memories | Total requests | Failures | Failure rate | Throughput | Avg latency | P50 | P95 | Max | Avg selected | Avg brief chars |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `40` | `0` | `0.0` | `7.346 rps` | `1074.4ms` | `1038ms` | `1272ms` | `1295ms` | `1.0` | `121` |
+| `1000` | `40` | `0` | `0.0` | `4.1443 rps` | `1865.625ms` | `1955ms` | `2235ms` | `2236ms` | `1.0` | `121` |
+
+### Interpretation
+
+- under concurrent recall pressure, the runtime remained stable with `0` failures at both `500` and `1000` memories
+- latency is materially higher than the sequential benchmark path, which is expected under `8` parallel recall requests against the same in-process app/database
+- throughput still remains usable for this early baseline, but the numbers now show a real next-stage optimization frontier:
+  - sequential scaling is already healthy
+  - concurrent recall is now the main pressure point to watch
+- output compactness remained perfectly stable:
+  - `selected_count` stayed fixed at `1`
+  - `brief_chars` stayed fixed at `121`
+
+### Updated Conclusion
+
+The current retrieval path looks strong on three different axes:
+
+- `single-request scaling`: good through `1000` memories
+- `sequential soak stability`: good through `1000` memories with `0` failures
+- `concurrent recall stability`: good through `1000` memories with `0` failures, though latency under concurrency is now high enough that it should become the next optimization focus
