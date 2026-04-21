@@ -96,8 +96,34 @@ Current recall scaling looks `good` for the first production-oriented baseline:
 - latency remains low through `200`-memory multi-scenario pools
 - latency remains acceptable and predictable through `1000`-memory single-scenario runs
 
+## Soak Benchmark
+
+To measure repeated-recall stability on large memory pools, an additional soak benchmark was run on the `balanced_runtime` scenario.
+
+Configuration:
+
+- `50` sequential recall requests
+- same large durable/noise memory pool reused across the whole run
+
+### Results
+
+| Memories | Failures | Failure rate | Avg latency | P50 | P95 | Max | Avg selected | Avg brief chars |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `0` | `0.0` | `69.9ms` | `69ms` | `72ms` | `82ms` | `1.0` | `121` |
+| `1000` | `0` | `0.0` | `136.34ms` | `134ms` | `148ms` | `156ms` | `1.0` | `121` |
+
+### Interpretation
+
+- repeated recall remained stable with `0` failures at both `500` and `1000` memories
+- latency under soak grows roughly linearly between `500` and `1000`
+- recall output remained extremely stable:
+  - `selected_count` stayed fixed at `1`
+  - `brief_chars` stayed fixed at `121`
+
+This suggests the retrieval path is not only scaling reasonably by pool size, but also remains stable under repeated sequential use on the same namespace.
+
 ## Recommended Next Steps
 
-1. Add a `soak benchmark` for repeated recall requests on the same large memory pool.
-2. Optimize the benchmark harness so that full `500/1000` multi-scenario pools can complete faster.
-3. After that, add a true load/concurrency benchmark rather than only sequential recall measurements.
+1. Optimize the benchmark harness so that full `500/1000` multi-scenario pools can complete faster.
+2. Add a true load/concurrency benchmark rather than only sequential recall measurements.
+3. After that, compare in-process benchmark numbers with live container benchmarks on the same scenario pack.
