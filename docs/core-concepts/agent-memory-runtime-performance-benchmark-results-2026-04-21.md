@@ -61,7 +61,7 @@ Configuration:
 
 ## Larger Single-Scenario Scaling Runs
 
-To get a clearer scaling curve without waiting for a full `4 x scenario` pool at larger sizes, the `balanced_runtime` scenario was also run separately at `500` and `1000` memories.
+To get a clearer scaling curve without waiting for a full `4 x scenario` pool at larger sizes, the `balanced_runtime` scenario was also run separately at `500`, `1000`, and `3000` memories.
 
 ### Results
 
@@ -70,15 +70,19 @@ To get a clearer scaling curve without waiting for a full `4 x scenario` pool at
 | `200` | `23.8ms` | `19ms` | `32ms` | `32ms` | `2.2` | `249.4` |
 | `500` | `49.4ms` | `36ms` | `71ms` | `71ms` | `2.2` | `249.4` |
 | `1000` | `96.8ms` | `78ms` | `139ms` | `139ms` | `2.2` | `249.4` |
+| `3000` | `651.175ms` | `646ms` | `687ms` | `691ms` | `2.0` | `315` |
 
 ### Interpretation
 
-- latency growth is roughly linear between `200`, `500`, and `1000` candidate memories
-- even at `1000` memories, the average recall stays under `100ms` in the current in-process benchmark path
+- latency growth is still healthy through `1000`, but `3000` is the first point where the curve clearly steepens
+- even at `3000` memories, recall remained stable with `0` failures in the current in-process benchmark path
 - `selected_count` remains stable
-- `brief_chars` remains stable
+- `brief_chars` remains bounded
+- the bottleneck at `3000` is clearly `candidate_fetch`
+  - `488.275ms` on average
+  - about `79.74%` of internal recall work
 
-This suggests the main retrieval path is currently scaling well for at least the first `1000` candidates.
+This suggests the main retrieval path is currently scaling well for the first `1000` candidates and remains usable at `3000`, but the fetch/query path becomes the dominant scaling frontier by that point.
 
 ## Operational Note
 
@@ -86,6 +90,33 @@ The full multi-scenario pool at `500+` memories per scenario already becomes a h
 
 - memory retrieval still looks healthy
 - but the benchmark harness and job-processing contour should be optimized further before we rely on full `4-scenario x 1000-memory` runs as a routine regression gate
+
+## Scale Benchmark Trend Summary
+
+To make future trend checks easier, the runtime now has a dedicated `scale-benchmark` command that runs the same concurrent recall benchmark across multiple memory counts and emits a compact trend summary.
+
+Configuration used for the current baseline:
+
+- `balanced_runtime`
+- `8` concurrent recall workers
+- `5` rounds
+- memory counts: `500`, `1000`, `3000`
+
+### Trend Summary
+
+| Memories | Throughput | Avg latency | P95 latency | `candidate_fetch` | `feedback_lookup` | `audit_record` | Failures |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `32.0819 rps` | `226.925ms` | `249ms` | `58.6ms` | `52.0ms` | `26.25ms` | `0` |
+| `1000` | `24.6868 rps` | `305.275ms` | `322ms` | `140.025ms` | `45.8ms` | `25.75ms` | `0` |
+| `3000` | `11.9971 rps` | `651.175ms` | `687ms` | `488.275ms` | `45.3ms` | `31.075ms` | `0` |
+
+### Interpretation
+
+- `500 -> 1000` still looks like a healthy scaling step
+- `1000 -> 3000` is where the trend becomes much more fetch-dominated
+- `feedback_lookup` stays relatively flat, which is useful evidence that it is no longer the primary scaling limiter
+- `audit_record` grows modestly, but nowhere near enough to explain the `3000` jump
+- `candidate_fetch` is now the clearest production-oriented trend line to watch
 
 ## Current Conclusion
 
@@ -95,6 +126,82 @@ Current recall scaling looks `good` for the first production-oriented baseline:
 - brief size remains bounded
 - latency remains low through `200`-memory multi-scenario pools
 - latency remains acceptable and predictable through `1000`-memory single-scenario runs
+- `3000` is now the first explicit “stress trend” point and shows that the runtime still behaves correctly, but is becoming decisively `candidate_fetch`-bound
+
+## How Close These Benchmarks Are To Real Life
+
+The current benchmark story is intentionally split into two layers:
+
+1. `in-process` benchmark paths
+2. `real local HTTP/runtime` validation
+
+### What The In-Process Benchmarks Are Good At
+
+The in-process `TestClient` path is a good approximation for:
+
+- retrieval algorithm trend lines
+- recall compactness behavior
+- phase-by-phase CPU/query-shape regressions
+- comparing optimizations against a stable local baseline
+
+This is why it is useful for questions like:
+
+- “did `candidate_fetch` get cheaper?”
+- “did `selection` stay bounded at `3000` memories?”
+- “did throughput improve after a query-shape change?”
+
+### What The In-Process Benchmarks Underestimate
+
+The same path is not a full production simulation. It underestimates:
+
+- real HTTP/socket overhead
+- true worker/job-drain behavior
+- service startup and transport overhead
+- DB lock/contention behavior under a live API + worker contour
+
+### Real Local HTTP Validation
+
+A follow-up validation was run against a real local runtime:
+
+- `uvicorn` on `127.0.0.1:8099`
+- separate worker process
+- same benchmark harness pointed at `--base-url`
+
+That run produced an important realism signal:
+
+- live ingestion and recall for the `1000` path worked
+- the heavier `3000` setup failed during mass event ingestion with:
+  - `sqlite3.OperationalError: database is locked`
+
+This is actually useful evidence rather than noise:
+
+- it shows the current in-process benchmarks are `closer to recall-core reality` than to `full service reality`
+- it also shows that `SQLite` is not an adequate proxy for production-like concurrent ingestion at the heavier end of the benchmark range
+
+### Practical Production Readiness Conclusion
+
+So the honest answer is:
+
+- for `recall-core trends`, the current benchmarks are quite useful and realistic
+- for `full end-to-end runtime behavior`, they are only partially realistic
+
+The current benchmark stack is therefore good enough for:
+
+- comparing recall optimizations
+- detecting trend regressions
+- understanding scaling bottlenecks
+
+But it is not yet sufficient by itself for:
+
+- final production capacity planning
+- realistic high-load ingestion modeling
+- full service SLO commitments
+
+To get closer to production reality, the next benchmark layer should be:
+
+- real local HTTP + worker
+- backed by `Postgres`, not `SQLite`
+- with the same `500 / 1000 / 3000` trend points
 
 ## Soak Benchmark
 

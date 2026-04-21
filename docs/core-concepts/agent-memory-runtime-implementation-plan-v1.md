@@ -239,6 +239,24 @@
 - component tests на `/metrics`
 - component tests на `/v1/observability/stats`
 
+### Текущий performance/scalability baseline
+
+В сервисе уже есть production-oriented performance harness:
+
+- single-request `performance-benchmark`
+- sequential `soak-benchmark`
+- concurrent `load-benchmark`
+- multi-size `scale-benchmark`
+- phase profiling для `candidate_fetch`, `candidate_build`, `feedback_lookup`, `ranking`, `selection`, `audit_*`
+
+Практический статус на сегодня:
+
+- sequential recall выглядит здорово до `1000` memories
+- concurrent recall после оптимизаций тоже существенно ускорен
+- для trend analysis теперь есть отдельный baseline на `3000` memories
+- отдельно зафиксирована методологическая проверка `in-process` vs `real local HTTP runtime`, чтобы не путать алгоритмическую скорость памяти со скоростью полного сервисного контура
+- live verification также показала важный operational нюанс: для тяжелых `3000`-memory ingestion/load прогонов `SQLite` уже перестает быть хорошим production proxy из-за `database is locked`; следующий реалистичный benchmark layer должен идти через `Postgres`
+
 ### Статус `Phase H`
 
 `Phase H` считается завершенной в первом рабочем объеме.
