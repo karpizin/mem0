@@ -433,6 +433,22 @@ cd /Users/slava/Documents/mem0-src/memory-runtime
 make inspect-memory-lifecycle ARGS="--namespace-id <namespace-id> --agent-id <agent-id> --limit 10"
 ```
 
+### Удалить contaminated / pre-fix memory unit
+
+Если новый policy-guardrail уже исправлен, но в памяти остались старые bad records, их нужно удалить явно.
+Типичный пример: до фикса в long-term memory успел попасть `Wi-Fi password`, `API key` или другой privacy-sensitive secret.
+
+```bash
+curl -X DELETE \
+  "http://127.0.0.1:8080/v1/adapters/openclaw/memories/<memory-id>?namespace_id=<namespace-id>&agent_id=<agent-id>"
+```
+
+После удаления:
+
+- еще раз проверить `GET /v1/adapters/openclaw/memories?...`
+- убедиться, что contaminated memory больше не видна в adapter surface
+- затем уже перепрогнать live scenario на свежем runtime, чтобы подтвердить, что новый guardrail переводит такой candidate в `reject`, а не просто опирается на ручной cleanup
+
 ### Объяснить recall по живому query
 
 ```bash
