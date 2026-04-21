@@ -144,13 +144,14 @@ Worker-derived operational counters (`jobs_*`, `consolidation_*`, `lifecycle_*`)
 Текущий MCP surface включает:
 - `initialize`
 - `tools/list`
-- `tools/call` для `memory.recall`, `memory.search`, `memory.list_spaces`, `memory.get_observability_snapshot`, `memory.get_memory_unit`
+- `tools/call` для `memory.recall`, `memory.search`, `memory.list_spaces`, `memory.get_observability_snapshot`, `memory.get_memory_unit`, `memory.ingest_event`, `memory.record_feedback`
 - `resources/templates/list`
 - `resources/read`
 - `prompts/list`
 - `prompts/get`
 Для ресурса `latest agent brief` runtime сохраняет `recall_executed` entries в `audit_log`, чтобы MCP-клиенты могли читать последний recall без отдельного кеша.
-MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_resource_reads_total`, `mcp_prompt_requests_total`, `mcp_errors_total`) экспортируются через `/metrics`.
+Safe write tools идут только через существующие runtime paths: `memory.ingest_event` использует обычный ingestion pipeline, а `memory.record_feedback` использует существующий recall feedback path.
+MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_calls_total`, `mcp_resource_reads_total`, `mcp_prompt_requests_total`, `mcp_errors_total`) экспортируются через `/metrics`.
 
 ## Тесты
 
@@ -175,7 +176,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_resource_reads_
 - idempotent ingestion for duplicate events on the same dedupe key
 - recall trace explainability with decisive selection signals
 - golden compactness regression for low-budget memory briefs
-- MCP Streamable HTTP facade with tools/resources/prompts contract and transport validation
+- MCP Streamable HTTP facade with tools/resources/prompts contract, safe write tools, and transport validation
 
 Команды запуска:
 

@@ -73,6 +73,10 @@ _METRIC_DEFINITIONS = {
         "counter",
         "Total MCP tool calls handled by the runtime.",
     ),
+    "mcp_write_tool_calls_total": (
+        "counter",
+        "Total MCP write-oriented tool calls handled by the runtime.",
+    ),
     "mcp_resource_reads_total": (
         "counter",
         "Total MCP resource reads handled by the runtime.",

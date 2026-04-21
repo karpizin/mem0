@@ -16,7 +16,9 @@ from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.memory_spaces import MemorySpaceRepository
 from app.repositories.memory_units import MemoryUnitRepository
 from app.repositories.namespaces import NamespaceRepository
-from app.schemas.recall import RecallRequest
+from app.schemas.event import EventCreate
+from app.schemas.recall import RecallFeedbackRequest, RecallRequest
+from app.services.ingestion import IngestionService
 from app.services.observability import ObservabilityService
 from app.services.retrieval import RetrievalService
 from app.telemetry.metrics import increment_metric
@@ -61,6 +63,7 @@ class MCPService:
         self.spaces = MemorySpaceRepository(session)
         self.memory_units = MemoryUnitRepository(session)
         self.audit = AuditLogRepository(session)
+        self.ingestion = IngestionService(session)
         self.retrieval = RetrievalService(session)
         self.observability = ObservabilityService(session)
 
@@ -103,7 +106,7 @@ class MCPService:
             return {"tools": [self._tool_payload(tool) for tool in self._tools()]}
         if method == "tools/call":
             increment_metric("mcp_tool_calls_total")
-            return self._call_tool(params)
+            return self._call_tool(params, client_name=client_name, user_id=user_id)
         if method in {"resources/templates/list", "resources/list"}:
             return {"resourceTemplates": [self._resource_template_payload(item) for item in self._resource_templates()]}
         if method == "resources/read":
@@ -132,7 +135,7 @@ class MCPService:
             },
         }
 
-    def _call_tool(self, params: dict[str, Any]) -> dict[str, Any]:
+    def _call_tool(self, params: dict[str, Any], *, client_name: str, user_id: str) -> dict[str, Any]:
         tool_name = params.get("name")
         arguments = params.get("arguments") or {}
         if not isinstance(tool_name, str):
@@ -150,6 +153,12 @@ class MCPService:
             data = self.observability.stats().model_dump()
         elif tool_name == "memory.get_memory_unit":
             data = self._get_memory_unit(arguments)
+        elif tool_name == "memory.ingest_event":
+            increment_metric("mcp_write_tool_calls_total")
+            data = self._ingest_event(arguments, client_name=client_name, user_id=user_id)
+        elif tool_name == "memory.record_feedback":
+            increment_metric("mcp_write_tool_calls_total")
+            data = self._record_feedback(arguments, client_name=client_name, user_id=user_id)
         else:
             return {
                 "isError": True,
@@ -249,6 +258,126 @@ class MCPService:
             "updated_at": self._isoformat(memory.updated_at),
             "supersedes_memory_id": memory.supersedes_memory_id,
         }
+
+    def _ingest_event(
+        self,
+        arguments: dict[str, Any],
+        *,
+        client_name: str,
+        user_id: str,
+    ) -> dict[str, Any]:
+        namespace_id = self._require_str(arguments, "namespace_id")
+        agent_id = arguments.get("agent_id")
+        session_id = arguments.get("session_id")
+        project_id = arguments.get("project_id")
+        event_type = self._require_str(arguments, "event_type")
+        event_origin = self._require_str(arguments, "event_origin")
+        space_hint = arguments.get("space_hint")
+        messages = arguments.get("messages")
+        metadata = dict(arguments.get("metadata") or {})
+        dedupe_key = arguments.get("dedupe_key")
+        timestamp = arguments.get("timestamp")
+
+        self._guard_ingest_scope(
+            namespace_id=namespace_id,
+            agent_id=agent_id,
+            session_id=session_id,
+            space_hint=space_hint,
+        )
+        metadata.setdefault("mcp_client_name", client_name)
+        metadata.setdefault("mcp_user_id", user_id)
+        metadata.setdefault("mcp_tool_name", "memory.ingest_event")
+
+        event = self.ingestion.ingest_event(
+            EventCreate(
+                namespace_id=namespace_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                project_id=project_id,
+                source_system=client_name,
+                event_type=event_type,
+                event_origin=event_origin,
+                timestamp=timestamp,
+                space_hint=space_hint,
+                messages=messages,
+                metadata=metadata,
+                dedupe_key=dedupe_key,
+            )
+        )
+        return {
+            "event": event.model_dump(mode="json"),
+            "guardrails": {
+                "direct_durable_write": "forbidden",
+                "path": "ingestion_pipeline",
+            },
+        }
+
+    def _record_feedback(
+        self,
+        arguments: dict[str, Any],
+        *,
+        client_name: str,
+        user_id: str,
+    ) -> dict[str, Any]:
+        namespace_id = self._require_str(arguments, "namespace_id")
+        helpful = arguments.get("helpful")
+        episode_ids = arguments.get("episode_ids")
+        if not isinstance(helpful, bool):
+            raise ValueError("'helpful' must be a boolean")
+        if not isinstance(episode_ids, list) or not episode_ids:
+            raise ValueError("'episode_ids' must be a non-empty list")
+
+        payload = RecallFeedbackRequest(
+            namespace_id=namespace_id,
+            agent_id=arguments.get("agent_id"),
+            helpful=helpful,
+            episode_ids=episode_ids,
+            query=arguments.get("query"),
+            notes=arguments.get("notes"),
+        )
+        result = self.retrieval.record_feedback(payload)
+        return {
+            "feedback": result.model_dump(),
+            "metadata": {
+                "mcp_client_name": client_name,
+                "mcp_user_id": user_id,
+            },
+        }
+
+    def _guard_ingest_scope(
+        self,
+        *,
+        namespace_id: str,
+        agent_id: str | None,
+        session_id: str | None,
+        space_hint: str | None,
+    ) -> None:
+        namespace = self.namespaces.get_by_id(namespace_id)
+        if namespace is None:
+            raise LookupError(f"Namespace '{namespace_id}' not found")
+
+        if space_hint == "shared-space":
+            if agent_id is not None:
+                agent = self.agents.get_by_id(agent_id)
+                if agent is None or agent.namespace_id != namespace_id:
+                    raise LookupError(f"Agent '{agent_id}' not found in namespace '{namespace_id}'")
+            return
+
+        if agent_id is None:
+            raise MCPError(
+                -32602,
+                "memory.ingest_event requires 'agent_id' for agent-scoped writes. Use space_hint='shared-space' for namespace-scoped writes.",
+            )
+
+        agent = self.agents.get_by_id(agent_id)
+        if agent is None or agent.namespace_id != namespace_id:
+            raise LookupError(f"Agent '{agent_id}' not found in namespace '{namespace_id}'")
+
+        if session_id is not None and space_hint == "agent-core":
+            raise MCPError(
+                -32602,
+                "memory.ingest_event does not allow session-scoped writes into 'agent-core'.",
+            )
 
     def _read_resource(self, params: dict[str, Any]) -> dict[str, Any]:
         uri = self._require_str(params, "uri")
@@ -549,6 +678,58 @@ class MCPService:
                         "memory_unit_id": {"type": "string"},
                     },
                     "required": ["namespace_id", "memory_unit_id"],
+                },
+            ),
+            MCPTool(
+                name="memory.ingest_event",
+                description="Safely ingest an event into the runtime through the normal ingestion pipeline.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "namespace_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                        "session_id": {"type": "string"},
+                        "project_id": {"type": "string"},
+                        "event_type": {"type": "string"},
+                        "event_origin": {"type": "string"},
+                        "timestamp": {"type": "string", "format": "date-time"},
+                        "space_hint": {"type": "string"},
+                        "messages": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "role": {"type": "string"},
+                                    "content": {"type": "string"},
+                                },
+                                "required": ["role", "content"],
+                            },
+                        },
+                        "metadata": {"type": "object"},
+                        "dedupe_key": {"type": "string"},
+                    },
+                    "required": ["namespace_id", "event_type", "event_origin", "messages"],
+                },
+            ),
+            MCPTool(
+                name="memory.record_feedback",
+                description="Record positive or negative recall feedback for selected episode ids.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "namespace_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                        "helpful": {"type": "boolean"},
+                        "episode_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {"type": "string"},
+                        },
+                        "query": {"type": "string"},
+                        "notes": {"type": "string"},
+                    },
+                    "required": ["namespace_id", "helpful", "episode_ids"],
                 },
             ),
         ]

@@ -91,7 +91,7 @@
 
 1. `tools + resources` — реализовано
 2. `prompts` — реализовано в baseline-объеме
-3. optional safe write tools — отложено
+3. optional safe write tools — реализовано в safe-by-default объеме
 
 ## 6. Tools v1
 
@@ -275,7 +275,7 @@ Prompts не должны быть “магией”, а удобными opera
 
 В первой MCP-версии write-path должен быть ограниченным.
 
-### Разрешено позже
+### Разрешено
 
 - `memory.ingest_event`
 - `memory.record_feedback`
@@ -314,6 +314,7 @@ MCP server должен быть thin adapter над уже существующ
 - `memory.search` -> adapter/runtime search service
 - `memory.get_observability_snapshot` -> `ObservabilityService`
 - `memory.record_feedback` -> `Recall feedback service`
+- `memory.ingest_event` -> `IngestionService`
 
 Нельзя:
 
@@ -329,6 +330,7 @@ MCP server должен быть thin adapter над уже существующ
 
 - `mcp_requests_total`
 - `mcp_tool_calls_total`
+- `mcp_write_tool_calls_total`
 - `mcp_resource_reads_total`
 - `mcp_prompt_requests_total`
 - `mcp_errors_total`
@@ -442,6 +444,10 @@ MCP server должен быть thin adapter над уже существующ
 Дополнительный practical step:
 
 - добавить маленький MCP client smoke script, чтобы быстрее проверять подключение реального `OpenClaw` к MCP facade до полноценных live-сценариев
+
+Статус:
+
+- `completed` для baseline safe-write объема
 
 ## 16. Final Recommendation
 

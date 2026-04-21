@@ -3,10 +3,12 @@ import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.database import Base, get_engine, reset_database_caches
+from app.models.audit_log import AuditLog
+from app.models.memory_event import MemoryEvent
 from app.main import create_app
 from app.models.memory_unit import MemoryUnit
 from app.telemetry.metrics import reset_metrics
@@ -136,6 +138,8 @@ class MCPApiTests(unittest.TestCase):
         self.assertIn("memory.list_spaces", tool_names)
         self.assertIn("memory.get_observability_snapshot", tool_names)
         self.assertIn("memory.get_memory_unit", tool_names)
+        self.assertIn("memory.ingest_event", tool_names)
+        self.assertIn("memory.record_feedback", tool_names)
 
         recall_response = self._post_mcp(
             _jsonrpc(
@@ -292,6 +296,7 @@ class MCPApiTests(unittest.TestCase):
         self.assertEqual(metrics_response.status_code, 200)
         self.assertIn("memory_runtime_mcp_requests_total", metrics_response.text)
         self.assertIn("memory_runtime_mcp_tool_calls_total", metrics_response.text)
+        self.assertIn("memory_runtime_mcp_write_tool_calls_total", metrics_response.text)
         self.assertIn("memory_runtime_mcp_resource_reads_total", metrics_response.text)
         self.assertIn("memory_runtime_mcp_prompt_requests_total", metrics_response.text)
 
@@ -353,3 +358,110 @@ class MCPApiTests(unittest.TestCase):
             item["id"] for item in response.json()["result"]["structuredContent"]["results"]
         }
         self.assertTrue(result_ids.intersection(memory_ids))
+
+    def test_safe_write_tools_ingest_events_and_record_feedback(self) -> None:
+        self._post_mcp(_initialize_payload())
+
+        ingest_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "agent_id": self.agent_id,
+                        "session_id": "run_mcp_ingest_event",
+                        "event_type": "project_update",
+                        "event_origin": "user_input",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": "We also decided that the memory-runtime should expose safe MCP write tools.",
+                            }
+                        ],
+                        "metadata": {"project_id": "proj-mcp"},
+                    },
+                },
+                req_id=12,
+            )
+        )
+
+        self.assertEqual(ingest_response.status_code, 200)
+        ingest_payload = ingest_response.json()["result"]["structuredContent"]
+        self.assertEqual(ingest_payload["guardrails"]["path"], "ingestion_pipeline")
+        self.assertEqual(ingest_payload["event"]["event_origin"], "user_input")
+
+        with get_engine().begin() as connection:
+            event_count = connection.execute(select(func.count(MemoryEvent.id))).scalar_one()
+        self.assertGreaterEqual(event_count, 3)
+
+        WorkerRunner.run_pending_jobs()
+        WorkerRunner.run_pending_jobs()
+
+        recall_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.recall",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "agent_id": self.agent_id,
+                        "query": "What MCP write tools were added to the memory runtime?",
+                        "context_budget_tokens": 900,
+                    },
+                },
+                req_id=13,
+            )
+        )
+        trace = recall_response.json()["result"]["structuredContent"]["trace"]
+        self.assertTrue(trace["selected_episode_ids"])
+
+        feedback_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.record_feedback",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "agent_id": self.agent_id,
+                        "helpful": True,
+                        "episode_ids": trace["selected_episode_ids"][:1],
+                        "query": "What MCP write tools were added to the memory runtime?",
+                    },
+                },
+                req_id=14,
+            )
+        )
+        feedback_payload = feedback_response.json()["result"]["structuredContent"]["feedback"]
+        self.assertEqual(feedback_payload["recorded_count"], 1)
+        self.assertTrue(feedback_payload["helpful"])
+
+        with get_engine().begin() as connection:
+            feedback_count = connection.execute(
+                select(func.count(AuditLog.id)).where(AuditLog.action == "recall_feedback_positive")
+            ).scalar_one()
+        self.assertGreaterEqual(feedback_count, 1)
+
+    def test_ingest_event_guardrails_reject_agent_scoped_write_without_agent(self) -> None:
+        self._post_mcp(_initialize_payload())
+
+        response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "event_type": "project_update",
+                        "event_origin": "user_input",
+                        "messages": [{"role": "user", "content": "Store this in project memory."}],
+                    },
+                },
+                req_id=15,
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], -32602)
+        self.assertIn("requires 'agent_id' for agent-scoped writes", payload["error"]["message"])

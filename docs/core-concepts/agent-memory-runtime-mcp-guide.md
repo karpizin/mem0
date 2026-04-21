@@ -491,34 +491,63 @@ curl -s http://localhost:8080/mcp/openclaw/http/alice \
 
 - `namespace_id`
 
+#### `memory.ingest_event`
+
+Нужен для безопасной записи нового события в память через обычный ingestion pipeline.
+
+Аргументы:
+
+- `namespace_id`
+- optional `agent_id`
+- optional `session_id`
+- optional `project_id`
+- `event_type`
+- `event_origin`
+- optional `space_hint`
+- `messages`
+- optional `metadata`
+- optional `dedupe_key`
+
+Guardrails:
+
+- agent-scoped write требует `agent_id`
+- namespace-scoped write без `agent_id` разрешен только с `space_hint=shared-space`
+- tool не умеет писать напрямую в durable memory в обход ingestion/consolidation
+
+#### `memory.record_feedback`
+
+Нужен для записи positive/negative recall feedback через уже существующий feedback path.
+
+Аргументы:
+
+- `namespace_id`
+- optional `agent_id`
+- `helpful`
+- `episode_ids`
+- optional `query`
+- optional `notes`
+
 ## 10. Ограничения текущей реализации
 
 Сейчас MCP layer:
 
 - stateless
-- read-first
-- не поддерживает safe write tools
+- read-first, но уже с безопасным write-минимумом
 - не поддерживает realtime subscriptions
 - не реализует отдельную auth model поверх runtime
 
 Пока не поддерживается:
 
-- `memory.ingest_event`
-- `memory.record_feedback`
 - destructive admin operations
+- direct durable-memory write bypass
+- lifecycle/admin mutation
 
 ## 11. Следующие шаги
 
 Следующие согласованные задачи по MCP:
 
-- добавить safe write MCP tools:
-  - `memory.ingest_event`
-  - `memory.record_feedback`
-- ввести для них guardrails:
-  - обязательный namespace scope
-  - обязательный agent scope там, где write agent-scoped
-  - запрет на direct durable-memory bypass
-  - запрет на lifecycle/admin mutation через MCP
+- расширить safe write MCP tools дополнительными smoke/e2e проверками
+- углубить guardrails и namespace-isolation coverage для write-path
 - подготовить маленький MCP client smoke script для быстрого подключения и проверки реального `OpenClaw`
 
 Практический смысл smoke script:
@@ -526,6 +555,8 @@ curl -s http://localhost:8080/mcp/openclaw/http/alice \
 - быстро проверить `initialize`
 - быстро проверить `tools/list`
 - быстро проверить `memory.recall`
+- быстро проверить `memory.ingest_event`
+- быстро проверить `memory.record_feedback`
 - быстро проверить transport/headers без полного live-сценария
 
 ## 12. Типовые ошибки

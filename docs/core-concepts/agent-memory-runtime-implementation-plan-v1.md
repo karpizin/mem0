@@ -1153,10 +1153,10 @@ Definition of Done:
 - `MCP` facade использует существующие runtime services, а не отдельную business-logic ветку
 - latest recall brief сохраняется в `audit_log` как `recall_executed`
 - `MCP` surface уже покрыт component tests и входит в общий green suite
+- safe write MCP tools `memory.ingest_event` и `memory.record_feedback` реализованы под guardrails и маппятся только на существующие runtime paths
 
 Следующий rollout:
 
-- safe write MCP tools (`memory.ingest_event`, `memory.record_feedback`) под guardrails
 - более глубокие namespace isolation/shared-space edge cases через MCP
 - optional дополнительные транспорты поверх того же thin facade, если это реально потребуется интеграциям
 - маленький MCP client smoke script для быстрого подключения и проверки реального `OpenClaw`
