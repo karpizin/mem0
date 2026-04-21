@@ -94,6 +94,31 @@ def _create_event(
     return response.json()
 
 
+def _record_feedback(
+    client,
+    *,
+    namespace_id: str,
+    agent_id: str,
+    episode_ids: list[str],
+    helpful: bool,
+    query: str,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    response = client.post(
+        "/v1/recall/feedback",
+        json={
+            "namespace_id": namespace_id,
+            "agent_id": agent_id,
+            "episode_ids": episode_ids,
+            "helpful": helpful,
+            "query": query,
+            "notes": notes,
+        },
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def _list_memory_units(
     engine: Engine,
     *,
@@ -182,23 +207,55 @@ def _evaluate_dialogue_scenario(
     default_session_id = scenario.get("session_id", f"{scenario['id']}:{suffix}")
 
     ingested_events: list[dict[str, Any]] = []
+    operation_results: list[dict[str, Any]] = []
     stats_payload: dict[str, Any] = {}
-    for turn in scenario["dialogue"]:
-        ingested_events.append(
-            _create_event(
+    operations = scenario.get("script")
+    if operations is None:
+        operations = [{"type": "ingest", "turn": turn} for turn in scenario["dialogue"]]
+
+    for operation in operations:
+        op_type = operation["type"]
+        if op_type == "ingest":
+            event = _create_event(
                 client,
                 namespace_id=namespace_id,
                 agent_id=agent_id,
-                turn=turn,
+                turn=operation["turn"],
                 default_session_id=default_session_id,
             )
-        )
-        stats_payload = _wait_for_jobs(
-            client,
-            job_drainer=job_drainer,
-            poll_seconds=poll_seconds,
-            max_wait_seconds=max_wait_seconds,
-        )
+            ingested_events.append(event)
+            operation_results.append({"type": "ingest", "event": event})
+            stats_payload = _wait_for_jobs(
+                client,
+                job_drainer=job_drainer,
+                poll_seconds=poll_seconds,
+                max_wait_seconds=max_wait_seconds,
+            )
+            continue
+
+        if op_type == "feedback":
+            target_indices = operation.get("target_turn_indexes", [])
+            episode_ids = [ingested_events[index]["episode_id"] for index in target_indices]
+            feedback_result = _record_feedback(
+                client,
+                namespace_id=namespace_id,
+                agent_id=agent_id,
+                episode_ids=episode_ids,
+                helpful=operation["helpful"],
+                query=operation["query"],
+                notes=operation.get("notes"),
+            )
+            operation_results.append(
+                {
+                    "type": "feedback",
+                    "helpful": operation["helpful"],
+                    "episode_ids": episode_ids,
+                    "feedback": feedback_result,
+                }
+            )
+            continue
+
+        raise ValueError(f"Unsupported dialogue eval script step type '{op_type}'")
 
     long_term_units = _list_memory_units(engine, namespace_id=namespace_id, scope="long-term")
     short_term_units = _list_memory_units(engine, namespace_id=namespace_id, scope="short-term")
@@ -210,6 +267,12 @@ def _evaluate_dialogue_scenario(
         (row.details_json or {}).get("reason")
         for row in audit_rows
         if (row.details_json or {}).get("reason")
+    ]
+    audit_signal_values = [
+        str(value)
+        for row in audit_rows
+        for value in ((row.details_json or {}).get("signals") or {}).values()
+        if value is not None
     ]
 
     expectations = scenario.get("expectations", {})
@@ -229,14 +292,27 @@ def _evaluate_dialogue_scenario(
     )
     missing_actions = [item for item in audit.get("must_include_actions", []) if item not in audit_actions]
     missing_reasons = [item for item in audit.get("must_include_reasons", []) if item not in audit_reasons]
+    missing_signal_values = [
+        item for item in audit.get("must_include_signal_values", []) if item not in audit_signal_values
+    ]
     forbidden_actions = [item for item in audit.get("must_not_include_actions", []) if item in audit_actions]
     forbidden_reasons = [item for item in audit.get("must_not_include_reasons", []) if item in audit_reasons]
+    forbidden_signal_values = [
+        item for item in audit.get("must_not_include_signal_values", []) if item in audit_signal_values
+    ]
     audit_result = {
-        "passed": not missing_actions and not missing_reasons and not forbidden_actions and not forbidden_reasons,
+        "passed": not missing_actions
+        and not missing_reasons
+        and not missing_signal_values
+        and not forbidden_actions
+        and not forbidden_reasons
+        and not forbidden_signal_values,
         "missing_actions": missing_actions,
         "missing_reasons": missing_reasons,
+        "missing_signal_values": missing_signal_values,
         "forbidden_actions": forbidden_actions,
         "forbidden_reasons": forbidden_reasons,
+        "forbidden_signal_values": forbidden_signal_values,
     }
 
     recall_results: list[dict[str, Any]] = []
@@ -278,6 +354,7 @@ def _evaluate_dialogue_scenario(
         "namespace_id": namespace_id,
         "agent_id": agent_id,
         "ingested_event_ids": [event["id"] for event in ingested_events],
+        "operations": operation_results,
         "jobs_by_status": stats_payload.get("jobs", {}).get("by_status", {}),
         "storage": {
             "long_term": {
@@ -293,6 +370,7 @@ def _evaluate_dialogue_scenario(
             **audit_result,
             "actions": audit_actions,
             "reasons": audit_reasons,
+            "signal_values": audit_signal_values,
         },
         "recall_checks": recall_results,
     }

@@ -240,6 +240,9 @@ Live runner теперь имеет отдельный process-timeout guard и 
 - что попало в `long-term` memory
 - что было демотировано или отклонено по `audit_log`
 - что потом реально вспоминается через `recall`
+Harness теперь поддерживает и scripted сценарии:
+- последовательности `ingest -> feedback -> ingest` для проверки rescue-loop поведения
+- ожидания по `audit.actions`, `audit.reasons` и `audit.signal_values`, чтобы различать `blocked rescue` и обычный demotion
 Первые сценарии в этом наборе размечены вручную и уже включают не только короткие synthetic turns, но и несколько длинных бытовых dialogue threads в стиле Telegram/WhatsApp, чтобы baseline проверял поведение памяти на шумной реальной переписке.
 Promotion decision layer теперь включает и первый `rescue loop`:
 - повторяющиеся `session_only` кандидаты с причиной `insufficient_specificity_not_durable` могут позже продвинуться в durable memory

@@ -694,6 +694,7 @@ Definition of Done:
 
 - `make quality-eval` прогоняет golden recall scenarios
 - `make dialogue-eval` прогоняет manually annotated multi-turn dialogue fixtures и проверяет storage + audit + recall как единый memory outcome
+- dialogue-eval теперь покрывает и scripted rescue scenarios с `negative feedback`, проверяя не только `audit.reason`, но и `audit.signal_values`
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

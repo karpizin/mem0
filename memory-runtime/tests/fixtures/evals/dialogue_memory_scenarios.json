@@ -345,5 +345,130 @@
         }
       ]
     }
+  },
+  {
+    "id": "negative-feedback-blocks-weak-rescue",
+    "description": "A repeated weak session-only candidate should stay demoted if earlier recall feedback marked it as unhelpful.",
+    "annotation_notes": "Manual annotation: the weak assistant note is intentionally low-specificity. Repetition alone would normally rescue it, but explicit negative feedback should block that rescue.",
+    "namespace_mode": "isolated",
+    "agent_name": "reviewer",
+    "session_id": "dialogue-negative-feedback-weak",
+    "script": [
+      {
+        "type": "ingest",
+        "turn": {
+          "event_type": "conversation_turn",
+          "event_origin": "agent_output",
+          "space_hint": "project-space",
+          "role": "assistant",
+          "content": "Please note this."
+        }
+      },
+      {
+        "type": "feedback",
+        "target_turn_indexes": [0],
+        "helpful": false,
+        "query": "Was this weak note useful in recall?"
+      },
+      {
+        "type": "ingest",
+        "turn": {
+          "event_type": "conversation_turn",
+          "event_origin": "agent_output",
+          "space_hint": "project-space",
+          "role": "assistant",
+          "content": "Please note this.",
+          "session_id": "dialogue-negative-feedback-weak-repeat"
+        }
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_not_contain": [
+          "Please note this"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_candidate_demoted_session_only",
+          "recall_feedback_negative"
+        ],
+        "must_include_reasons": [
+          "insufficient_specificity_not_durable"
+        ],
+        "must_include_signal_values": [
+          "negative_feedback_outweighs_rescue"
+        ],
+        "must_not_include_actions": [
+          "memory_unit_created"
+        ]
+      }
+    }
+  },
+  {
+    "id": "net-positive-feedback-allows-transient-rescue",
+    "description": "A useful transient-looking note can be rescued later when positive feedback outweighs negative signals.",
+    "annotation_notes": "Manual annotation: the phrase looks transient because it starts as a scratch note, but repeated usefulness in recall should eventually promote it once feedback is clearly net-positive.",
+    "namespace_mode": "isolated",
+    "agent_name": "operator",
+    "session_id": "dialogue-net-positive-rescue",
+    "script": [
+      {
+        "type": "ingest",
+        "turn": {
+          "event_type": "conversation_turn",
+          "event_origin": "user_input",
+          "space_hint": "project-space",
+          "role": "user",
+          "content": "Temporary scratch note: this timeout issue happens before every pilot demo."
+        }
+      },
+      {
+        "type": "feedback",
+        "target_turn_indexes": [0],
+        "helpful": true,
+        "query": "Was this note useful during recall?"
+      },
+      {
+        "type": "ingest",
+        "turn": {
+          "event_type": "conversation_turn",
+          "event_origin": "user_input",
+          "space_hint": "project-space",
+          "role": "user",
+          "content": "Temporary scratch note: this timeout issue happens before every pilot demo.",
+          "session_id": "dialogue-net-positive-rescue-repeat"
+        }
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "timeout issue happens before every pilot demo"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_candidate_demoted_session_only",
+          "recall_feedback_positive",
+          "memory_unit_created"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable"
+        ],
+        "must_not_include_reasons": [
+          "negative_feedback_outweighs_rescue"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-net-positive-rescue-recall",
+          "query": "What recurring issue should I remember for future pilot demos?",
+          "must_contain": [
+            "timeout issue happens before every pilot demo"
+          ]
+        }
+      ]
+    }
   }
 ]
