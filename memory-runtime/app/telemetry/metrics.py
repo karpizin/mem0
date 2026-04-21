@@ -100,6 +100,11 @@ _MCP_PROMPT_COUNTERS: Counter[tuple[str, str]] = Counter()
 _MCP_CLIENT_COUNTERS: Counter[str] = Counter()
 _MCP_REQUEST_LATENCY_BUCKETS: Counter[str] = Counter()
 _MCP_TOOL_LATENCY_BUCKETS: Counter[str] = Counter()
+_RECALL_LATENCY_BUCKETS: Counter[str] = Counter()
+_RECALL_CANDIDATE_BUCKETS: Counter[str] = Counter()
+_RECALL_SELECTED_BUCKETS: Counter[str] = Counter()
+_RECALL_EXTERNAL_CANDIDATE_BUCKETS: Counter[str] = Counter()
+_RECALL_BRIEF_ITEM_BUCKETS: Counter[str] = Counter()
 _LOCK = Lock()
 
 _LATENCY_BUCKETS_MS = (50, 250, 1000, 5000, 10000)
@@ -131,6 +136,28 @@ def record_mcp_tool_call(*, tool_name: str, status: str, latency_ms: int) -> Non
         _MCP_TOOL_LATENCY_BUCKETS[_latency_bucket(latency_ms)] += 1
 
 
+def record_recall_observation(
+    *,
+    latency_ms: int,
+    candidate_count: int,
+    selected_count: int,
+    external_candidate_count: int,
+    brief_item_count: int,
+) -> None:
+    with _LOCK:
+        _RECALL_LATENCY_BUCKETS[_latency_bucket(latency_ms)] += 1
+        _RECALL_CANDIDATE_BUCKETS[_count_bucket(candidate_count)] += 1
+        _RECALL_SELECTED_BUCKETS[_count_bucket(selected_count)] += 1
+        _RECALL_EXTERNAL_CANDIDATE_BUCKETS[_count_bucket(external_candidate_count)] += 1
+        _RECALL_BRIEF_ITEM_BUCKETS[_count_bucket(brief_item_count)] += 1
+        _COUNTERS["recall_latency_ms_total"] += latency_ms
+        _COUNTERS["recall_candidate_count_total"] += candidate_count
+        _COUNTERS["recall_selected_count_total"] += selected_count
+        _COUNTERS["recall_external_candidate_count_total"] += external_candidate_count
+        _COUNTERS["recall_brief_item_count_total"] += brief_item_count
+        _COUNTERS["recall_latency_ms_max"] = max(_COUNTERS["recall_latency_ms_max"], latency_ms)
+
+
 def record_mcp_resource_read(*, resource_name: str, status: str) -> None:
     with _LOCK:
         _MCP_RESOURCE_COUNTERS[(resource_name, status)] += 1
@@ -154,6 +181,30 @@ def snapshot_mcp_metrics() -> dict[str, dict]:
         }
 
 
+def snapshot_recall_metrics() -> dict[str, object]:
+    with _LOCK:
+        observed = int(_COUNTERS.get("recall_requests_total", 0))
+        latency_total = int(_COUNTERS.get("recall_latency_ms_total", 0))
+        candidate_total = int(_COUNTERS.get("recall_candidate_count_total", 0))
+        selected_total = int(_COUNTERS.get("recall_selected_count_total", 0))
+        external_total = int(_COUNTERS.get("recall_external_candidate_count_total", 0))
+        brief_total = int(_COUNTERS.get("recall_brief_item_count_total", 0))
+        return {
+            "requests_observed_total": observed,
+            "latency_buckets_ms": dict(sorted(_RECALL_LATENCY_BUCKETS.items())),
+            "candidate_buckets": dict(sorted(_RECALL_CANDIDATE_BUCKETS.items())),
+            "selected_buckets": dict(sorted(_RECALL_SELECTED_BUCKETS.items())),
+            "external_candidate_buckets": dict(sorted(_RECALL_EXTERNAL_CANDIDATE_BUCKETS.items())),
+            "brief_item_buckets": dict(sorted(_RECALL_BRIEF_ITEM_BUCKETS.items())),
+            "latency_ms_total": latency_total,
+            "latency_ms_max": int(_COUNTERS.get("recall_latency_ms_max", 0)),
+            "avg_candidate_count": round((candidate_total / observed) if observed else 0.0, 4),
+            "avg_selected_count": round((selected_total / observed) if observed else 0.0, 4),
+            "avg_external_candidate_count": round((external_total / observed) if observed else 0.0, 4),
+            "avg_brief_item_count": round((brief_total / observed) if observed else 0.0, 4),
+        }
+
+
 def snapshot_metrics() -> dict[str, int]:
     with _LOCK:
         snapshot = {name: 0 for name in _KNOWN_COUNTERS}
@@ -171,6 +222,11 @@ def reset_metrics() -> None:
         _MCP_CLIENT_COUNTERS.clear()
         _MCP_REQUEST_LATENCY_BUCKETS.clear()
         _MCP_TOOL_LATENCY_BUCKETS.clear()
+        _RECALL_LATENCY_BUCKETS.clear()
+        _RECALL_CANDIDATE_BUCKETS.clear()
+        _RECALL_SELECTED_BUCKETS.clear()
+        _RECALL_EXTERNAL_CANDIDATE_BUCKETS.clear()
+        _RECALL_BRIEF_ITEM_BUCKETS.clear()
 
 
 def render_prometheus_metrics(
@@ -255,6 +311,40 @@ def render_prometheus_metrics(
     for bucket, value in sorted((mcp_metrics.get("tool_latency_buckets_ms") or {}).items()):
         lines.append(f'memory_runtime_mcp_tool_latency_bucket_total{{bucket_ms="{bucket}"}} {value}')
 
+    recall_metrics = quality_metrics.get("__recall_performance__") or {}
+    lines.append("# HELP memory_runtime_recall_latency_bucket_total Recall latency bucket counts in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_latency_bucket_total counter")
+    for bucket, value in sorted((recall_metrics.get("latency_buckets_ms") or {}).items()):
+        lines.append(f'memory_runtime_recall_latency_bucket_total{{bucket_ms="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_recall_candidate_bucket_total Recall candidate-count bucket totals.")
+    lines.append("# TYPE memory_runtime_recall_candidate_bucket_total counter")
+    for bucket, value in sorted((recall_metrics.get("candidate_buckets") or {}).items()):
+        lines.append(f'memory_runtime_recall_candidate_bucket_total{{bucket="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_recall_selected_bucket_total Recall selected-count bucket totals.")
+    lines.append("# TYPE memory_runtime_recall_selected_bucket_total counter")
+    for bucket, value in sorted((recall_metrics.get("selected_buckets") or {}).items()):
+        lines.append(f'memory_runtime_recall_selected_bucket_total{{bucket="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_recall_external_candidate_bucket_total External recall candidate-count bucket totals.")
+    lines.append("# TYPE memory_runtime_recall_external_candidate_bucket_total counter")
+    for bucket, value in sorted((recall_metrics.get("external_candidate_buckets") or {}).items()):
+        lines.append(f'memory_runtime_recall_external_candidate_bucket_total{{bucket="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_recall_brief_item_bucket_total Recall brief-item-count bucket totals.")
+    lines.append("# TYPE memory_runtime_recall_brief_item_bucket_total counter")
+    for bucket, value in sorted((recall_metrics.get("brief_item_buckets") or {}).items()):
+        lines.append(f'memory_runtime_recall_brief_item_bucket_total{{bucket="{bucket}"}} {value}')
+
+    lines.append("# HELP memory_runtime_recall_latency_ms_total Total recall latency in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_latency_ms_total counter")
+    lines.append(f'memory_runtime_recall_latency_ms_total {int(recall_metrics.get("latency_ms_total", 0))}')
+
+    lines.append("# HELP memory_runtime_recall_latency_ms_max Maximum observed recall latency in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_latency_ms_max gauge")
+    lines.append(f'memory_runtime_recall_latency_ms_max {int(recall_metrics.get("latency_ms_max", 0))}')
+
     lines.append("# HELP memory_runtime_promotion_decision_total Promotion decisions grouped by outcome and reason.")
     lines.append("# TYPE memory_runtime_promotion_decision_total counter")
     for reason_name, reason_counts in (
@@ -293,6 +383,14 @@ def _latency_bucket(latency_ms: int) -> str:
         if latency_ms <= upper_bound:
             return f"le_{upper_bound}"
     return "gt_10000"
+
+
+def _count_bucket(value: int) -> str:
+    thresholds = (1, 3, 5, 10, 25, 50, 100, 250, 500)
+    for upper_bound in thresholds:
+        if value <= upper_bound:
+            return f"le_{upper_bound}"
+    return "gt_500"
 
 
 def _pair_counter_snapshot(counter: Counter[tuple[str, str]]) -> dict[str, dict[str, int]]:

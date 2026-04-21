@@ -337,29 +337,7 @@ class AdapterService:
             agent_id=agent_id,
             session_id=session_id,
         )
-        return [
-            _AdapterMemoryCandidate(
-                id=episode.id,
-                resource_kind="episode",
-                space_type=space_type,
-                memory=episode.raw_text,
-                summary=episode.summary,
-                score=None,
-                created_at=episode.created_at,
-                updated_at=episode.created_at,
-                metadata={
-                    "session_id": episode.session_id,
-                    "space_type": space_type,
-                    "sensitive": detect_sensitive_reason(episode.raw_text) is not None,
-                    "sensitivity_reason": detect_sensitive_reason(episode.raw_text),
-                    "masked": detect_sensitive_reason(episode.raw_text) is not None
-                    and should_mask_sensitive_outputs(),
-                },
-                is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
-                sensitivity_reason=detect_sensitive_reason(episode.raw_text),
-            )
-            for episode, space_type in rows
-        ]
+        return [self._episode_candidate(episode=episode, space_type=space_type) for episode, space_type in rows]
 
     def _long_term_candidates(
         self,
@@ -434,6 +412,12 @@ class AdapterService:
             return None
         space = self.spaces.get_by_id(episode.space_id) if episode.space_id else None
         space_type = space.space_type if space is not None else "session-space"
+        return self._episode_candidate(episode=episode, space_type=space_type)
+
+    @staticmethod
+    def _episode_candidate(*, episode, space_type: str) -> _AdapterMemoryCandidate:
+        sensitivity_reason = detect_sensitive_reason(episode.raw_text)
+        is_sensitive = sensitivity_reason is not None
         return _AdapterMemoryCandidate(
             id=episode.id,
             resource_kind="episode",
@@ -446,13 +430,12 @@ class AdapterService:
             metadata={
                 "session_id": episode.session_id,
                 "space_type": space_type,
-                "sensitive": detect_sensitive_reason(episode.raw_text) is not None,
-                "sensitivity_reason": detect_sensitive_reason(episode.raw_text),
-                "masked": detect_sensitive_reason(episode.raw_text) is not None
-                and should_mask_sensitive_outputs(),
+                "sensitive": is_sensitive,
+                "sensitivity_reason": sensitivity_reason,
+                "masked": is_sensitive and should_mask_sensitive_outputs(),
             },
-            is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
-            sensitivity_reason=detect_sensitive_reason(episode.raw_text),
+            is_sensitive=is_sensitive,
+            sensitivity_reason=sensitivity_reason,
         )
 
     @staticmethod

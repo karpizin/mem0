@@ -20,6 +20,21 @@ class MCPStats(BaseModel):
     tool_latency_buckets_ms: dict[str, int] = Field(default_factory=dict)
 
 
+class RecallPerformanceStats(BaseModel):
+    requests_observed_total: int = 0
+    latency_buckets_ms: dict[str, int] = Field(default_factory=dict)
+    candidate_buckets: dict[str, int] = Field(default_factory=dict)
+    selected_buckets: dict[str, int] = Field(default_factory=dict)
+    external_candidate_buckets: dict[str, int] = Field(default_factory=dict)
+    brief_item_buckets: dict[str, int] = Field(default_factory=dict)
+    latency_ms_total: int = 0
+    latency_ms_max: int = 0
+    avg_candidate_count: float = 0.0
+    avg_selected_count: float = 0.0
+    avg_external_candidate_count: float = 0.0
+    avg_brief_item_count: float = 0.0
+
+
 class RescueQualityStats(BaseModel):
     applied_total: int = 0
     blocked_total: int = 0
@@ -40,5 +55,6 @@ class PromotionQualityStats(BaseModel):
 class ObservabilityStats(BaseModel):
     metrics: dict[str, int] = Field(default_factory=dict)
     jobs: JobStats
+    performance: RecallPerformanceStats = Field(default_factory=RecallPerformanceStats)
     mcp: MCPStats = Field(default_factory=MCPStats)
     quality: PromotionQualityStats = Field(default_factory=PromotionQualityStats)

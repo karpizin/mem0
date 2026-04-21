@@ -23,7 +23,12 @@ from app.schemas.recall import (
     RecallTrace,
 )
 from app.services.mem0_bridge import ExternalMemoryResult, build_mem0_bridge
-from app.telemetry.metrics import increment_metric
+from app.telemetry.metrics import (
+    elapsed_milliseconds,
+    increment_metric,
+    monotonic_timer,
+    record_recall_observation,
+)
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+")
@@ -100,6 +105,7 @@ class RetrievalService:
         self.mem0_bridge = build_mem0_bridge(get_settings())
 
     def recall(self, payload: RecallRequest) -> RecallResponse:
+        started_at = monotonic_timer()
         namespace = self.namespaces.get_by_id(payload.namespace_id)
         if namespace is None:
             raise LookupError(f"Namespace '{payload.namespace_id}' not found")
@@ -130,22 +136,7 @@ class RetrievalService:
             entity_ids=[episode.id for episode, _space_type in rows],
         )
 
-        candidates = [
-            RetrievalCandidate(
-                episode_id=episode.id,
-                space_type=space_type,
-                event_type=self._extract_event_type(episode.summary),
-                summary=episode.summary,
-                raw_text=episode.raw_text,
-                importance_hint=episode.importance_hint,
-                created_at=episode.created_at,
-                session_id=episode.session_id,
-                usefulness_score=feedback_scores.get(episode.id, 0.0),
-                is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
-                sensitivity_reason=detect_sensitive_reason(episode.raw_text),
-            )
-            for episode, space_type in rows
-        ]
+        candidates = [self._candidate_from_episode(episode, space_type, feedback_scores) for episode, space_type in rows]
         external_candidates = self._external_candidates(
             query=payload.query,
             namespace_id=payload.namespace_id,
@@ -173,6 +164,13 @@ class RetrievalService:
         increment_metric("recall_requests_total")
         increment_metric("recall_candidates_total", len(candidates))
         increment_metric("recall_selected_total", selected_count)
+        record_recall_observation(
+            latency_ms=elapsed_milliseconds(started_at),
+            candidate_count=len(candidates),
+            selected_count=selected_count,
+            external_candidate_count=len(external_candidates),
+            brief_item_count=selected_count,
+        )
         log_event(
             logger,
             "retrieval.completed",
@@ -185,6 +183,7 @@ class RetrievalService:
             selected_episode_ids=selected_episode_ids,
             selected_space_types=selected_space_types,
             slot_counts={slot: len(items) for slot, items in brief_dict.items()},
+            latency_ms=elapsed_milliseconds(started_at),
         )
         response = RecallResponse(
             brief=MemoryBrief(**brief_dict),
@@ -213,6 +212,28 @@ class RetrievalService:
         )
         self.session.commit()
         return response
+
+    @classmethod
+    def _candidate_from_episode(
+        cls,
+        episode,
+        space_type: str,
+        feedback_scores: dict[str, float],
+    ) -> RetrievalCandidate:
+        sensitivity_reason = detect_sensitive_reason(episode.raw_text)
+        return RetrievalCandidate(
+            episode_id=episode.id,
+            space_type=space_type,
+            event_type=cls._extract_event_type(episode.summary),
+            summary=episode.summary,
+            raw_text=episode.raw_text,
+            importance_hint=episode.importance_hint,
+            created_at=episode.created_at,
+            session_id=episode.session_id,
+            usefulness_score=feedback_scores.get(episode.id, 0.0),
+            is_sensitive=sensitivity_reason is not None,
+            sensitivity_reason=sensitivity_reason,
+        )
 
     def record_feedback(self, payload: RecallFeedbackRequest) -> RecallFeedbackResponse:
         namespace = self.namespaces.get_by_id(payload.namespace_id)

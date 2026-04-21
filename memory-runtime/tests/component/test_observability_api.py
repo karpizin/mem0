@@ -157,16 +157,81 @@ class ObservabilityApiTests(unittest.TestCase):
         payload = response.json()
         self.assertIn("metrics", payload)
         self.assertIn("jobs", payload)
+        self.assertIn("performance", payload)
         self.assertIn("mcp", payload)
         self.assertEqual(payload["metrics"]["recall_requests_total"], 0)
         self.assertEqual(payload["jobs"]["by_status"]["pending"], 1)
         self.assertEqual(payload["jobs"]["by_type"]["memory_consolidation"]["pending"], 1)
         self.assertIsNotNone(payload["jobs"]["oldest_pending_age_seconds"])
         self.assertEqual(payload["jobs"]["stalled_running_count"], 0)
+        self.assertEqual(payload["performance"]["requests_observed_total"], 0)
         self.assertEqual(payload["mcp"]["requests_by_method"]["tools/call"]["success"], 1)
         self.assertEqual(payload["mcp"]["tool_calls_by_name"]["memory.nope"]["result_error"], 1)
         self.assertEqual(payload["mcp"]["requests_by_client"]["openclaw"], 1)
         self.assertTrue(payload["mcp"]["request_latency_buckets_ms"])
+
+    def test_observability_reports_recall_performance_breakdowns(self) -> None:
+        self.client.post(
+            "/v1/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_perf_1",
+                "source_system": "openclaw",
+                "event_type": "architecture_decision",
+                "space_hint": "project-space",
+                "messages": [
+                    {"role": "assistant", "content": "Keep Postgres and Redis as the durable runtime stack."}
+                ],
+            },
+        )
+        self.client.post(
+            "/v1/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_perf_2",
+                "source_system": "openclaw",
+                "event_type": "conversation_turn",
+                "space_hint": "project-space",
+                "messages": [
+                    {"role": "assistant", "content": "Low-value bakery scratchpad note that should not dominate recall."}
+                ],
+            },
+        )
+        WorkerRunner.run_pending_jobs()
+
+        recall = self.client.post(
+            "/v1/recall",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_perf_recall",
+                "query": "What durable runtime stack should we use?",
+                "context_budget_tokens": 700,
+            },
+        )
+        self.assertEqual(recall.status_code, 200)
+
+        stats_response = self.client.get("/v1/observability/stats")
+        self.assertEqual(stats_response.status_code, 200)
+        payload = stats_response.json()
+        performance = payload["performance"]
+        self.assertEqual(performance["requests_observed_total"], 1)
+        self.assertGreaterEqual(performance["latency_ms_total"], 0)
+        self.assertTrue(performance["latency_buckets_ms"])
+        self.assertTrue(performance["candidate_buckets"])
+        self.assertTrue(performance["selected_buckets"])
+        self.assertGreaterEqual(performance["avg_candidate_count"], 1.0)
+        self.assertGreaterEqual(performance["avg_selected_count"], 1.0)
+
+        metrics_response = self.client.get("/metrics")
+        self.assertEqual(metrics_response.status_code, 200)
+        body = metrics_response.text
+        self.assertIn("memory_runtime_recall_latency_bucket_total", body)
+        self.assertIn("memory_runtime_recall_candidate_bucket_total", body)
+        self.assertIn("memory_runtime_recall_selected_bucket_total", body)
+        self.assertIn("memory_runtime_recall_latency_ms_total", body)
 
     def test_observability_quality_stats_report_promotion_and_rescue_breakdowns(self) -> None:
         self.client.post(

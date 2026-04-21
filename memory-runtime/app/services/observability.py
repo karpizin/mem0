@@ -5,8 +5,19 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.jobs import JobRepository
-from app.schemas.observability import JobStats, MCPStats, ObservabilityStats, PromotionQualityStats
-from app.telemetry.metrics import render_prometheus_metrics, snapshot_mcp_metrics, snapshot_metrics
+from app.schemas.observability import (
+    JobStats,
+    MCPStats,
+    ObservabilityStats,
+    PromotionQualityStats,
+    RecallPerformanceStats,
+)
+from app.telemetry.metrics import (
+    render_prometheus_metrics,
+    snapshot_mcp_metrics,
+    snapshot_metrics,
+    snapshot_recall_metrics,
+)
 
 
 class ObservabilityService:
@@ -18,6 +29,7 @@ class ObservabilityService:
 
     def metrics_payload(self) -> str:
         quality = self.audit.promotion_quality_summary()
+        quality["__recall_performance__"] = snapshot_recall_metrics()
         return render_prometheus_metrics(
             counters=self._metrics_snapshot(),
             job_status_counts=self._job_status_counts(),
@@ -45,6 +57,7 @@ class ObservabilityService:
                     stale_after_seconds=self.settings.stalled_job_after_seconds
                 ),
             ),
+            performance=RecallPerformanceStats(**snapshot_recall_metrics()),
             mcp=MCPStats(**snapshot_mcp_metrics()),
             quality=PromotionQualityStats(**quality),
         )

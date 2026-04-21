@@ -156,6 +156,22 @@ Observability теперь включает и quality-oriented breakdown для
 - `memory_runtime_promotion_signal_total`
 - `memory_runtime_promotion_novelty_state_total`
 - `memory_runtime_rescue_event_total`
+Recall observability теперь отдельно показывает performance/scalability breakdown:
+- `performance.requests_observed_total`
+- `performance.latency_buckets_ms`
+- `performance.candidate_buckets`
+- `performance.selected_buckets`
+- `performance.external_candidate_buckets`
+- `performance.brief_item_buckets`
+- `performance.avg_candidate_count`, `avg_selected_count`, `avg_external_candidate_count`, `avg_brief_item_count`
+Через `/metrics` это экспортируется как:
+- `memory_runtime_recall_latency_bucket_total`
+- `memory_runtime_recall_candidate_bucket_total`
+- `memory_runtime_recall_selected_bucket_total`
+- `memory_runtime_recall_external_candidate_bucket_total`
+- `memory_runtime_recall_brief_item_bucket_total`
+- `memory_runtime_recall_latency_ms_total`
+- `memory_runtime_recall_latency_ms_max`
 `/v1/recall/feedback` записывает usefulness signals, которые потом участвуют в последующем ranking.
 При включенном `mem0 bridge` runtime может синхронизировать long-term memories в `mem0` и использовать его как внешний recall source.
 `POST /mcp/{client_name}/http/{user_id}` реализует stateless MCP Streamable HTTP facade поверх тех же runtime services.
@@ -226,6 +242,7 @@ make quality-eval
 make dialogue-eval
 make lifecycle-eval
 make continuity-benchmark
+make performance-benchmark
 make compare-eval BEFORE=/path/to/before.json AFTER=/path/to/after.json
 make snapshot-pilot NAME=before-live
 make restore-pilot SNAPSHOT=before-live
@@ -280,6 +297,11 @@ Promotion decision layer теперь включает и первый `rescue l
 - при этом acknowledgement/status chatter и blocked origins не получают такого апгрейда “по инерции”
 `make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
 `make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.
+`make performance-benchmark ARGS="--memory-count 200 --query-count 5"` поднимает плотный synthetic memory pool, выполняет серию recall probes и возвращает JSON-отчет с:
+- `latency_ms` (`min / avg / p50 / p95 / max`)
+- `candidate_count`
+- `selected_count`
+- `brief_chars`
 Дополнительно retrieval и injection теперь имеют explicit high-density regressions:
 - unit-тест на `~40` candidate memories проверяет, что brief остается релевантным и не засоряется шумом
 - legacy recall test на `120` memories проверяет, что OpenClaw все равно подмешивает только компактный top-slice в рамках budget
