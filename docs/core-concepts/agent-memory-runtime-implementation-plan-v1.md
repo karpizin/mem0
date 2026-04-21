@@ -1154,10 +1154,11 @@ Definition of Done:
 - latest recall brief сохраняется в `audit_log` как `recall_executed`
 - `MCP` surface уже покрыт component tests и входит в общий green suite
 - safe write MCP tools `memory.ingest_event` и `memory.record_feedback` реализованы под guardrails и маппятся только на существующие runtime paths
+- MCP edge-case tests покрывают shared-space namespace writes, private project-memory isolation и запрет session-scoped writes в `agent-core`
 
 Следующий rollout:
 
-- более глубокие namespace isolation/shared-space edge cases через MCP
+- дополнительные edge-case и scale scenarios через MCP по мере роста числа клиентов
 - optional дополнительные транспорты поверх того же thin facade, если это реально потребуется интеграциям
 - углубление smoke/eval сценариев для MCP surface по мере появления новых интеграций
 

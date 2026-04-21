@@ -662,6 +662,9 @@ Guardrails:
 - prompt responses
 - metrics export
 - MCP smoke runner для safe write/read flow
+- shared-space write без `agent_id`
+- изоляция private `project-space` memory между агентами в shared namespace
+- guardrail на `session_id + agent-core` для `memory.ingest_event`
 
 Текущий рабочий baseline:
 
@@ -669,3 +672,4 @@ Guardrails:
 - пригоден для guarded write/read smoke через `memory.ingest_event` и `memory.record_feedback`
 - не заменяет REST adapters
 - хорошо подходит как compatibility layer и inspection surface
+- уже имеет неплохое edge-case покрытие по namespace isolation и write guardrails

@@ -97,7 +97,11 @@ class MemoryUnitRepository:
             .order_by(MemoryUnit.updated_at.desc())
         )
         if agent_id is not None:
-            stmt = stmt.where(MemoryUnit.agent_id == agent_id)
+            stmt = stmt.where(
+                (MemoryUnit.agent_id == agent_id)
+                | (MemoryUnit.agent_id.is_(None))
+                | (MemorySpace.space_type == "shared-space")
+            )
         if space_types:
             stmt = stmt.where(MemorySpace.space_type.in_(space_types))
         return list(self.session.execute(stmt).all())

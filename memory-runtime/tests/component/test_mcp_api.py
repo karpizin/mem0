@@ -465,3 +465,268 @@ class MCPApiTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["error"]["code"], -32602)
         self.assertIn("requires 'agent_id' for agent-scoped writes", payload["error"]["message"])
+
+    def test_shared_space_write_without_agent_is_visible_to_other_agent_via_mcp(self) -> None:
+        namespace_response = self.client.post(
+            "/v1/namespaces",
+            json={
+                "name": "openclaw:mcp:shared",
+                "mode": "shared",
+                "source_systems": ["openclaw"],
+            },
+        )
+        shared_namespace_id = namespace_response.json()["id"]
+        alpha_agent_id = self.client.post(
+            f"/v1/namespaces/{shared_namespace_id}/agents",
+            json={"name": "alpha", "source_system": "openclaw"},
+        ).json()["id"]
+        beta_agent_id = self.client.post(
+            f"/v1/namespaces/{shared_namespace_id}/agents",
+            json={"name": "beta", "source_system": "openclaw"},
+        ).json()["id"]
+
+        self._post_mcp(_initialize_payload())
+        ingest_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "event_type": "architecture_decision",
+                        "event_origin": "agent_output",
+                        "space_hint": "shared-space",
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "Shared deployment contract uses Redis and a dedicated worker queue.",
+                            }
+                        ],
+                    },
+                },
+                req_id=16,
+            )
+        )
+
+        ingest_payload = ingest_response.json()["result"]["structuredContent"]
+        self.assertEqual(ingest_payload["guardrails"]["path"], "ingestion_pipeline")
+        self.assertIsNone(ingest_payload["event"]["agent_id"])
+
+        WorkerRunner.run_pending_jobs()
+        WorkerRunner.run_pending_jobs()
+
+        recall_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.recall",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": beta_agent_id,
+                        "query": "What shared deployment contract exists for the runtime?",
+                        "context_budget_tokens": 900,
+                    },
+                },
+                req_id=17,
+            )
+        )
+        recall_payload = recall_response.json()["result"]["structuredContent"]
+        brief_items = [
+            item
+            for slot_items in recall_payload["brief"].values()
+            for item in slot_items
+        ]
+        self.assertTrue(any("dedicated worker queue" in item for item in brief_items))
+        self.assertIn("shared-space", recall_payload["trace"]["selected_space_types"])
+
+        spaces_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.list_spaces",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": alpha_agent_id,
+                    },
+                },
+                req_id=18,
+            )
+        )
+        space_types = {
+            item["space_type"]
+            for item in spaces_response.json()["result"]["structuredContent"]["spaces"]
+        }
+        self.assertIn("shared-space", space_types)
+
+    def test_ingest_event_guardrails_reject_session_scoped_agent_core_write(self) -> None:
+        self._post_mcp(_initialize_payload())
+
+        response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "agent_id": self.agent_id,
+                        "session_id": "run_mcp_agent_core_guardrail",
+                        "event_type": "policy_update",
+                        "event_origin": "agent_output",
+                        "space_hint": "agent-core",
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "This should not be accepted as a session-scoped agent-core write.",
+                            }
+                        ],
+                    },
+                },
+                req_id=19,
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], -32602)
+        self.assertIn("does not allow session-scoped writes into 'agent-core'", payload["error"]["message"])
+
+    def test_shared_namespace_mcp_keeps_private_project_memory_isolated(self) -> None:
+        namespace_response = self.client.post(
+            "/v1/namespaces",
+            json={
+                "name": "openclaw:mcp:shared-privacy",
+                "mode": "shared",
+                "source_systems": ["openclaw"],
+            },
+        )
+        shared_namespace_id = namespace_response.json()["id"]
+        alpha_agent_id = self.client.post(
+            f"/v1/namespaces/{shared_namespace_id}/agents",
+            json={"name": "alpha", "source_system": "openclaw"},
+        ).json()["id"]
+        beta_agent_id = self.client.post(
+            f"/v1/namespaces/{shared_namespace_id}/agents",
+            json={"name": "beta", "source_system": "openclaw"},
+        ).json()["id"]
+
+        self._post_mcp(_initialize_payload())
+        self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": alpha_agent_id,
+                        "event_type": "architecture_decision",
+                        "event_origin": "agent_output",
+                        "space_hint": "project-space",
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "Phoenix is the private migration codename for alpha's project plan.",
+                            }
+                        ],
+                    },
+                },
+                req_id=20,
+            )
+        )
+        self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.ingest_event",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "event_type": "architecture_decision",
+                        "event_origin": "agent_output",
+                        "space_hint": "shared-space",
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "The shared runtime stack uses Redis for the coordination layer.",
+                            }
+                        ],
+                    },
+                },
+                req_id=21,
+            )
+        )
+
+        WorkerRunner.run_pending_jobs()
+        WorkerRunner.run_pending_jobs()
+
+        alpha_search_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.search",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": alpha_agent_id,
+                        "query": "phoenix migration codename",
+                        "limit": 5,
+                    },
+                },
+                req_id=22,
+            )
+        )
+        alpha_results = alpha_search_response.json()["result"]["structuredContent"]["results"]
+        self.assertTrue(alpha_results)
+        private_memory_id = alpha_results[0]["id"]
+
+        beta_private_search_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.search",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": beta_agent_id,
+                        "query": "phoenix migration codename",
+                        "limit": 5,
+                    },
+                },
+                req_id=23,
+            )
+        )
+        beta_private_results = beta_private_search_response.json()["result"]["structuredContent"]["results"]
+        self.assertFalse(beta_private_results)
+
+        beta_shared_search_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.search",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": beta_agent_id,
+                        "query": "shared runtime stack redis coordination layer",
+                        "limit": 5,
+                    },
+                },
+                req_id=24,
+            )
+        )
+        beta_shared_results = beta_shared_search_response.json()["result"]["structuredContent"]["results"]
+        self.assertTrue(beta_shared_results)
+        self.assertTrue(any("Redis" in item["content"] for item in beta_shared_results))
+
+        forbidden_get_response = self._post_mcp(
+            _jsonrpc(
+                "tools/call",
+                {
+                    "name": "memory.get_memory_unit",
+                    "arguments": {
+                        "namespace_id": shared_namespace_id,
+                        "agent_id": beta_agent_id,
+                        "memory_unit_id": private_memory_id,
+                    },
+                },
+                req_id=25,
+            )
+        )
+        forbidden_get_payload = forbidden_get_response.json()
+        self.assertEqual(forbidden_get_payload["error"]["code"], -32004)
+        self.assertIn("is not visible to agent", forbidden_get_payload["error"]["message"])

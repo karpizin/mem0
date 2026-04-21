@@ -179,6 +179,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - golden compactness regression for low-budget memory briefs
 - MCP Streamable HTTP facade with tools/resources/prompts contract, safe write tools, and transport validation
 - отдельный MCP smoke runner для быстрой проверки guarded write/read flow на живом контуре
+- MCP edge-case coverage для `shared-space` writes, приватности private `project-space` и guardrails на `agent-core`
 
 Команды запуска:
 
