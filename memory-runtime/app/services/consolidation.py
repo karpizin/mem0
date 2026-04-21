@@ -147,7 +147,7 @@ class PromotionDecision:
     decision: str
     effective_scope: str
     reason: str | None
-    signals: dict[str, str | bool]
+    signals: dict[str, str | bool | int]
 
 
 class ConsolidationService:
@@ -164,6 +164,7 @@ class ConsolidationService:
         event = self.events.get_by_id(episode.start_event_id)
         event_origin = event.event_origin if event is not None else "user_input"
         content = self.build_memory_content(episode.summary)
+        merge_key = self.normalize_merge_key(content)
         log_event(
             logger,
             "consolidation.started",
@@ -179,6 +180,23 @@ class ConsolidationService:
             event_type=event_type,
             content=content,
         )
+        existing = None
+        if episode.space_id:
+            existing = self.memory_units.find_by_merge_key(
+                namespace_id=episode.namespace_id,
+                primary_space_id=episode.space_id,
+                merge_key=merge_key,
+            )
+
+        contradictory = None
+        if existing is None and episode.space_id:
+            contradictory = self.find_contradictory_memory(
+                namespace_id=episode.namespace_id,
+                primary_space_id=episode.space_id,
+                kind=kind,
+                content=content,
+            )
+
         promotion = self.evaluate_promotion_decision(
             event_origin=event_origin,
             inferred_scope=scope,
@@ -186,6 +204,7 @@ class ConsolidationService:
             kind=kind,
             event_type=event_type,
             space_type=space_type,
+            novelty_state=self._novelty_state(existing=existing, contradictory=contradictory),
         )
         log_event(
             logger,
@@ -262,25 +281,6 @@ class ConsolidationService:
             )
             return "ignored", episode.id
         scope = promotion.effective_scope
-        merge_key = self.normalize_merge_key(content)
-
-        existing = None
-        if episode.space_id:
-            existing = self.memory_units.find_by_merge_key(
-                namespace_id=episode.namespace_id,
-                primary_space_id=episode.space_id,
-                merge_key=merge_key,
-            )
-
-        contradictory = None
-        if existing is None and episode.space_id:
-            contradictory = self.find_contradictory_memory(
-                namespace_id=episode.namespace_id,
-                primary_space_id=episode.space_id,
-                kind=kind,
-                content=content,
-            )
-
         if existing is None and contradictory is None:
             memory_unit = self.memory_units.create(
                 namespace_id=episode.namespace_id,
@@ -434,6 +434,7 @@ class ConsolidationService:
         kind: str,
         event_type: str,
         space_type: str,
+        novelty_state: str = "new",
     ) -> PromotionDecision:
         low_trust_reason = cls.detect_low_trust_reason(content) if inferred_scope == "long-term" else None
         transient_reason = (
@@ -446,6 +447,14 @@ class ConsolidationService:
             if inferred_scope == "long-term"
             else None
         )
+        specificity_score = cls.compute_specificity_score(content)
+        durability_score = cls.compute_durability_score(
+            content=content,
+            kind=kind,
+            event_type=event_type,
+            space_type=space_type,
+            event_origin=event_origin,
+        )
         low_value_reason = (
             cls.detect_low_value_reason(
                 event_origin=event_origin,
@@ -457,15 +466,32 @@ class ConsolidationService:
             if inferred_scope == "long-term"
             else None
         )
+        weak_candidate_reason = (
+            cls.detect_weak_candidate_reason(
+                event_origin=event_origin,
+                kind=kind,
+                event_type=event_type,
+                space_type=space_type,
+                specificity_score=specificity_score,
+                durability_score=durability_score,
+                novelty_state=novelty_state,
+            )
+            if inferred_scope == "long-term"
+            else None
+        )
         signals = {
             "event_origin": event_origin,
             "inferred_scope": inferred_scope,
             "kind": kind,
             "event_type": event_type,
             "space_type": space_type,
+            "novelty_state": novelty_state,
+            "specificity_score": specificity_score,
+            "durability_score": durability_score,
             "low_trust": low_trust_reason is not None,
             "transient": transient_reason is not None,
             "low_value": low_value_reason is not None,
+            "weak_candidate": weak_candidate_reason is not None,
             "origin_demoted": event_origin in SESSION_ONLY_ORIGINS,
         }
 
@@ -507,6 +533,14 @@ class ConsolidationService:
                 decision="session_only",
                 effective_scope="short-term",
                 reason=low_value_reason,
+                signals=signals,
+            )
+
+        if weak_candidate_reason is not None:
+            return PromotionDecision(
+                decision="session_only",
+                effective_scope="short-term",
+                reason=weak_candidate_reason,
                 signals=signals,
             )
 
@@ -567,6 +601,30 @@ class ConsolidationService:
             return "operational_status_not_durable"
 
         return None
+
+    @classmethod
+    def detect_weak_candidate_reason(
+        cls,
+        *,
+        event_origin: str,
+        kind: str,
+        event_type: str,
+        space_type: str,
+        specificity_score: int,
+        durability_score: int,
+        novelty_state: str,
+    ) -> str | None:
+        if novelty_state != "new":
+            return None
+        if event_origin not in {"agent_output", "tool_output", "operator_template"}:
+            return None
+        if kind in {"decision", "procedure"} or event_type in {"architecture_decision", "decision", "policy_update"}:
+            return None
+        if space_type not in {"project-space", "shared-space"}:
+            return None
+        if specificity_score >= 4 or durability_score >= 2:
+            return None
+        return "insufficient_specificity_not_durable"
 
     @staticmethod
     def build_memory_content(summary: str) -> str:
@@ -670,6 +728,46 @@ class ConsolidationService:
             if token not in NEGATION_TOKENS and token not in FILLER_TOKENS
         ]
         return " ".join(tokens[:6])
+
+    @classmethod
+    def compute_specificity_score(cls, content: str) -> int:
+        meaningful_tokens = [
+            token
+            for token in cls._tokens(content)
+            if token not in FILLER_TOKENS
+        ]
+        return len(set(meaningful_tokens))
+
+    @classmethod
+    def compute_durability_score(
+        cls,
+        *,
+        content: str,
+        kind: str,
+        event_type: str,
+        space_type: str,
+        event_origin: str,
+    ) -> int:
+        score = 0
+        if kind in {"decision", "procedure"}:
+            score += 2
+        if event_type in {"architecture_decision", "decision", "policy_update", "procedure", "rule"}:
+            score += 2
+        if space_type in {"project-space", "shared-space"}:
+            score += 1
+        if event_origin in {"user_input", "external_import"}:
+            score += 1
+        if cls.compute_specificity_score(content) >= 6:
+            score += 1
+        return score
+
+    @staticmethod
+    def _novelty_state(*, existing, contradictory) -> str:
+        if existing is not None:
+            return "reinforcing_existing"
+        if contradictory is not None:
+            return "contradictory_existing"
+        return "new"
 
     @staticmethod
     def _normalize_text(content: str) -> str:

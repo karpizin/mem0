@@ -128,6 +128,7 @@ class ConsolidationServiceContractTests(unittest.TestCase):
         self.assertEqual(decision.decision, "promote")
         self.assertIsNone(decision.reason)
         self.assertEqual(decision.effective_scope, "long-term")
+        self.assertEqual(decision.signals["novelty_state"], "new")
 
     def test_evaluate_promotion_decision_demotes_transient_project_note(self) -> None:
         from app.services.consolidation import ConsolidationService
@@ -207,3 +208,52 @@ class ConsolidationServiceContractTests(unittest.TestCase):
 
         self.assertEqual(decision.decision, "promote")
         self.assertIsNone(decision.reason)
+
+    def test_evaluate_promotion_decision_demotes_low_specificity_agent_output_fact(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Please note this.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+        )
+
+        self.assertEqual(decision.decision, "session_only")
+        self.assertEqual(decision.reason, "insufficient_specificity_not_durable")
+        self.assertEqual(decision.signals["weak_candidate"], True)
+        self.assertEqual(decision.signals["specificity_score"], 2)
+
+    def test_evaluate_promotion_decision_keeps_specific_agent_output_fact_promotable(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Phoenix is the internal codename for the runtime migration project.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+        )
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertIsNone(decision.reason)
+        self.assertGreaterEqual(decision.signals["specificity_score"], 4)
+
+    def test_evaluate_promotion_decision_keeps_reinforcing_existing_candidate_promotable(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Please note this.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+            novelty_state="reinforcing_existing",
+        )
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertEqual(decision.signals["novelty_state"], "reinforcing_existing")

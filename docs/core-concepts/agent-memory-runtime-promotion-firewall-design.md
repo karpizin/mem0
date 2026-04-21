@@ -137,10 +137,18 @@ Current implementation status:
 - implemented as an explicit internal decision layer in consolidation
 - provenance, low-trust, and transientness are now evaluated in one place
 - low-value assistant/tool operational notes are also demoted through the same decision layer
+- the decision layer now also evaluates:
+  - `novelty_state` (`new`, `reinforcing_existing`, `contradictory_existing`)
+  - `specificity_score`
+  - `durability_score`
 - long-term candidates can now be:
   - promoted
   - demoted to `session_only`
   - rejected
+- weak new `agent_output` / `tool_output` / `operator_template` facts in `project-space` or `shared-space`
+  can now demote as `insufficient_specificity_not_durable`
+- the same weak content is not penalized if it is reinforcing an already durable candidate,
+  so merge/supersede paths remain available
 - `session-space` / inferred short-term candidates continue to materialize as short-term memory units
   so existing short-term lifecycle behavior is preserved
 - structured logs should capture:
@@ -198,6 +206,7 @@ In other words:
 - provenance handles junk amplification
 - low-trust handles poisoning
 - low-value heuristics handle truthful-but-noisy operational chatter
+- novelty/specificity/durability heuristics demote weak new assistant/tool facts without blocking strong decisions
 - later promotion logic handles usefulness
 
 ## Initial Test Plan

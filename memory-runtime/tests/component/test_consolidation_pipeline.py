@@ -352,3 +352,34 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(len(audit_rows), 1)
         self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
         self.assertIn("operational_status_not_durable", str(audit_rows[0][1]))
+
+    def test_worker_demotes_low_specificity_project_candidate_to_session_only(self) -> None:
+        payload = {
+            "namespace_id": self.namespace_id,
+            "agent_id": self.agent_id,
+            "session_id": "run_weak_1",
+            "source_system": "openclaw",
+            "event_type": "conversation_turn",
+            "space_hint": "project-space",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "Please note this.",
+                }
+            ],
+        }
+        self.client.post("/v1/events", json=payload)
+
+        processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(processed, 1)
+        with get_engine().connect() as connection:
+            memory_units_count = connection.execute(text("SELECT COUNT(*) FROM memory_units")).scalar_one()
+            audit_rows = connection.execute(
+                text("SELECT action, details_json FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
+
+        self.assertEqual(memory_units_count, 0)
+        self.assertEqual(len(audit_rows), 1)
+        self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
+        self.assertIn("insufficient_specificity_not_durable", str(audit_rows[0][1]))

@@ -1206,9 +1206,15 @@ Definition of Done:
   - low-value operational chatter demotion
   - transientness
   - inferred memory scope
+- decision layer now also uses:
+  - novelty state (`new`, `reinforcing_existing`, `contradictory_existing`)
+  - specificity scoring
+  - durability scoring
 - project/shared transient notes now demote to `session_only` instead of polluting long-term memory
 - low-trust poisoning patterns now flow through the same explicit decision layer instead of a separate implicit branch
 - low-value assistant/tool status notes such as timeout messages and acknowledgement-style turns now demote to `session_only`
+- weak new assistant/tool/operator facts now demote to `session_only` as `insufficient_specificity_not_durable`
+  while reinforcing existing durable memories can still merge/promote
 - mixed OpenClaw capture turns now drop `system` messages on ingestion when `user`/`assistant` content is present, so system/bootstrap prompt text no longer gets promoted as a durable fact
 - structured JSON logs now cover:
   - ingestion
