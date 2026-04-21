@@ -45,6 +45,12 @@ import { recall as skillRecall, sanitizeQuery } from "./recall.ts";
 import { shouldSkipLegacyRecall } from "./recall-policy.ts";
 import { buildLegacyRecallContext } from "./legacy-recall.ts";
 import {
+  buildLegacyRecallKey,
+  nextLegacyRecallId,
+  runLegacyRecallSingleFlight,
+} from "./legacy-recall-singleflight.ts";
+import { runLegacyRecallWithTimeout } from "./legacy-recall-timeout.ts";
+import {
   incrementSessionCount,
   checkCheapGates,
   checkMemoryGate,
@@ -670,10 +676,21 @@ function registerHooks(
       }
 
       const recallStart = Date.now();
+      const recallId = nextLegacyRecallId();
       const recallTimeoutMs = cfg.recallTimeoutMs;
       if (sessionId) {
         lastRecallAttemptedAtBySession.set(sessionId, recallStart);
       }
+      const recallKey = buildLegacyRecallKey({
+        sessionId,
+        isSubagent,
+        isNewSession,
+        cleanPrompt,
+      });
+      api.logger.info(
+        `openclaw-mem0: starting recall [${recallId}] (session=${sessionId ?? "unknown"}, key=${recallKey}, promptChars=${cleanPrompt.length})`,
+      );
+
       const recallWork = async () => {
         // Single search with a reasonable candidate pool
         const recallTopK = Math.max((cfg.topK ?? 5) * 2, 10);
@@ -747,6 +764,7 @@ function registerHooks(
 
         _captureEvent("openclaw.hook.recall", {
           strategy: "legacy",
+          recall_id: recallId,
           memory_count: compactContext.memoryCount,
           candidate_count: longTermResults.length,
           context_chars: compactContext.contextChars,
@@ -757,7 +775,7 @@ function registerHooks(
         });
 
         api.logger.info(
-          `openclaw-mem0: injecting ${compactContext.memoryCount}/${longTermResults.length} memories into context (${Date.now() - recallStart}ms/${recallTimeoutMs}ms budget, ${compactContext.contextChars} chars)`,
+          `openclaw-mem0: injecting ${compactContext.memoryCount}/${longTermResults.length} memories into context [${recallId}] (${Date.now() - recallStart}ms/${recallTimeoutMs}ms budget, ${compactContext.contextChars} chars)`,
         );
 
         return {
@@ -766,32 +784,47 @@ function registerHooks(
       };
 
       try {
-        const timeout = new Promise<undefined>((resolve) => {
-          setTimeout(() => resolve(undefined), recallTimeoutMs);
-        });
-        const result = await Promise.race([
-          recallWork(),
-          timeout.then(() => {
-            const latencyMs = Date.now() - recallStart;
-            _captureEvent("openclaw.hook.recall", {
-              strategy: "legacy",
-              memory_count: 0,
-              latency_ms: latencyMs,
-              timeout_ms: recallTimeoutMs,
-              timed_out: true,
-              session_kind: isSubagent ? "subagent" : "interactive",
-            });
-            api.logger.warn(
-              `openclaw-mem0: recall timed out after ${recallTimeoutMs}ms (elapsed ${latencyMs}ms, session ${sessionId ?? "unknown"}), skipping`,
-            );
-            return undefined;
+        const singleFlight = runLegacyRecallSingleFlight(recallKey, () =>
+          runLegacyRecallWithTimeout({
+            work: recallWork,
+            timeoutMs: recallTimeoutMs,
+            onTimeout: () => {
+              const latencyMs = Date.now() - recallStart;
+              _captureEvent("openclaw.hook.recall", {
+                strategy: "legacy",
+                recall_id: recallId,
+                memory_count: 0,
+                latency_ms: latencyMs,
+                timeout_ms: recallTimeoutMs,
+                timed_out: true,
+                session_kind: isSubagent ? "subagent" : "interactive",
+              });
+              api.logger.warn(
+                `openclaw-mem0: recall timed out after ${recallTimeoutMs}ms [${recallId}] (elapsed ${latencyMs}ms, session ${sessionId ?? "unknown"}), skipping`,
+              );
+            },
           }),
-        ]);
+        );
+
+        if (singleFlight.shared) {
+          _captureEvent("openclaw.hook.recall_deduped", {
+            strategy: "legacy",
+            recall_id: recallId,
+            recall_key: recallKey,
+            session_kind: isSubagent ? "subagent" : "interactive",
+          });
+          api.logger.info(
+            `openclaw-mem0: deduping concurrent recall [${recallId}] for key=${recallKey}`,
+          );
+        }
+
+        const result = await singleFlight.promise;
         return result;
       } catch (err) {
         const latencyMs = Date.now() - recallStart;
         _captureEvent("openclaw.hook.recall", {
           strategy: "legacy",
+          recall_id: recallId,
           memory_count: 0,
           latency_ms: latencyMs,
           timeout_ms: recallTimeoutMs,
@@ -799,7 +832,9 @@ function registerHooks(
           failed: true,
           session_kind: isSubagent ? "subagent" : "interactive",
         });
-        api.logger.warn(`openclaw-mem0: recall failed: ${String(err)}`);
+        api.logger.warn(
+          `openclaw-mem0: recall failed [${recallId}] after ${latencyMs}ms: ${String(err)}`,
+        );
       }
     });
   }

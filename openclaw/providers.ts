@@ -496,6 +496,7 @@ function decodeRuntimeId(memoryId: string): { namespaceId: string; resourceKind:
 
 class MemoryRuntimeProvider implements Mem0Provider {
   private scopeCache = new Map<string, Promise<RuntimeScope>>();
+  private readonly defaultRequestTimeoutMs = 30_000;
 
   constructor(
     private readonly runtimeConfig: NonNullable<Mem0Config["runtime"]>,
@@ -650,16 +651,34 @@ class MemoryRuntimeProvider implements Mem0Provider {
     return pending;
   }
 
-  private async request(method: string, path: string, body?: unknown): Promise<any> {
+  private async request(
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: { timeoutMs?: number },
+  ): Promise<any> {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers["content-type"] = "application/json";
     if (this.runtimeConfig.apiKey) headers["x-api-key"] = this.runtimeConfig.apiKey;
+    const timeoutMs = options?.timeoutMs ?? this.defaultRequestTimeoutMs;
+    const requestUrl = `${this.runtimeConfig.baseUrl.replace(/\/$/, "")}${path}`;
 
-    const response = await fetch(`${this.runtimeConfig.baseUrl.replace(/\/$/, "")}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    let response: Response;
+    try {
+      response = await fetch(requestUrl, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        throw new Error(
+          `Memory runtime request timed out after ${timeoutMs}ms: ${method} ${path}`,
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const text = await response.text();

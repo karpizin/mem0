@@ -208,4 +208,45 @@ describe("MemoryRuntimeProvider", () => {
     );
     await expect(provider.deleteAll("alice")).resolves.toBeUndefined();
   });
+
+  it("aborts stuck runtime search requests with a bounded timeout signal", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/adapters/openclaw/bootstrap")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              adapter: "openclaw",
+              source_system: "openclaw",
+              namespace_id: "ns-timeout",
+              namespace_name: "alice",
+              agent_id: "agent-timeout",
+              agent_name: "primary",
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url.endsWith("/v1/adapters/openclaw/search")) {
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return Promise.reject(new DOMException("Timed out", "TimeoutError"));
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = createProvider(
+      mem0ConfigSchema.parse({
+        mode: "runtime",
+        runtime: { baseUrl: "http://runtime.test" },
+      }),
+      { resolvePath: (p: string) => p } as any,
+    );
+
+    await expect(provider.search("what is stuck", { user_id: "alice" })).rejects.toThrow(
+      "Memory runtime request timed out after 30000ms: POST /v1/adapters/openclaw/search",
+    );
+  });
 });

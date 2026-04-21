@@ -188,6 +188,8 @@ openclaw mem0 dream --dry-run
 | `topK` | `number` | `5` | Max memories returned per recall |
 | `searchThreshold` | `number` | `0.5` | Minimum similarity score (0-1) |
 
+For live debugging, legacy auto-recall now logs a per-attempt `recall_id`, deduplicates identical in-flight recall work across plugin instances in the same process, and aborts stuck runtime HTTP requests after a bounded timeout.
+
 ### Platform Mode
 
 | Key | Type | Default | Description |

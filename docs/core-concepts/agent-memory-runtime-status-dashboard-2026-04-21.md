@@ -15,7 +15,7 @@ Current overall state: `MVP live-ready with important yellow zones`
 | `Forgetting / Lifecycle` | `yellow-green` | `7/10` | baseline decay/archive/eviction is in place; long-horizon behavior still needs more proof |
 | `Memory Hygiene / Junk Resistance` | `yellow-green` | `7/10` | provenance baseline, low-trust rejection, and low-value operational chatter demotion exist, but full anti-junk policy is still evolving |
 | `OpenClaw Integration` | `green` | `8/10` | runtime mode is live and real capture/recall flows work |
-| `OpenClaw Live Reliability` | `yellow` | `6/10` | the integration works, but heavy live scenarios still expose timeout bottlenecks; a separate continuity execution profile now exists, but timeouts still reproduce under it |
+| `OpenClaw Live Reliability` | `yellow` | `6.5/10` | the integration works, and the memory-side timeout picture is now much clearer; false-positive recall timeout logging is fixed, but heavy live scenarios still expose broader reliability bottlenecks |
 | `MCP Facade` | `green` | `7.5/10` | read-oriented MCP surface is implemented and usable |
 | `Local LLM Compatibility` | `yellow-green` | `7/10` | noisy JSON / Ollama hardening is already useful, but real-model coverage is still partial |
 | `Observability / Debuggability` | `green` | `8.5/10` | logs, traces, stats, pilot artifacts, and scorecards are strong |
@@ -46,19 +46,21 @@ Current overall state: `MVP live-ready with important yellow zones`
 ## Red / Main Risks
 
 - `OpenClaw embedded agent/provider timeout` on continuity-heavy live scenarios
-- plugin recall timeout is only partially mitigated so far
+- a clean separation between true memory-side timeout and false-positive timeout logging was only established very recently
 - production-grade reliability is not yet demonstrated
 
 ## Active Work
 
 ### `BL-001`
 
-Continue reducing the heavy `OpenClaw` plugin recall path, not just increasing timeout.
+Continue separating true memory-side timeout behavior from orchestration and logging artifacts.
 
 Latest step:
 
 - legacy recall injection was compacted so fewer, shorter memory lines reach the heavy live prompt path
 - a live sanity turn now shows `injecting 2/4 memories ... 319 chars` and can complete in ~13.9s, which suggests the memory-side prompt contribution is moving in the right direction
+- newer debugging work added abortable runtime requests, per-attempt `recall_id`, process-wide single-flight dedupe, and a fix for the timeout branch that could still log after a successful recall
+- fresh probe turns now show fast recall injection without the old trailing false timeout pattern
 
 ### `BL-004`
 
