@@ -240,7 +240,7 @@ Live runner теперь имеет отдельный process-timeout guard и 
 - что попало в `long-term` memory
 - что было демотировано или отклонено по `audit_log`
 - что потом реально вспоминается через `recall`
-Первые сценарии в этом наборе размечены вручную и служат baseline для future external dialogue corpora.
+Первые сценарии в этом наборе размечены вручную и уже включают не только короткие synthetic turns, но и несколько длинных бытовых dialogue threads в стиле Telegram/WhatsApp, чтобы baseline проверял поведение памяти на шумной реальной переписке.
 `make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
 `make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.
 `make compare-eval BEFORE=... AFTER=...` сравнивает два machine-readable eval report и показывает, где качество улучшилось, регрессировало или осталось без изменений.

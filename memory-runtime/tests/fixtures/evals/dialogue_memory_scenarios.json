@@ -166,5 +166,184 @@
         }
       ]
     }
+  },
+  {
+    "id": "household-chat-dietary-facts",
+    "description": "A noisy household-style chat should preserve important dietary facts while ignoring scratch planning and acknowledgements.",
+    "annotation_notes": "Manual annotation: this mimics a messy family messenger thread. The peanut allergy and oat milk preference are durable facts; short acknowledgements and tentative dinner-planning chatter should not dominate long-term memory.",
+    "namespace_mode": "isolated",
+    "agent_name": "family-helper",
+    "session_id": "dialogue-household-diet",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Later today let's check whether the small bakery near the park is still open."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Important for future dinners: Lena is allergic to peanuts, and Mila only drinks oat milk."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Okay."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary scratch note: maybe move dinner to Friday if everyone is tired."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "Lena is allergic to peanuts",
+          "Mila only drinks oat milk"
+        ],
+        "must_not_contain": [
+          "small bakery near the park",
+          "move dinner to Friday",
+          "Thanks",
+          "Okay"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "assistant_ack_not_durable",
+          "temporary_scratch_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-household-diet-recall",
+          "query": "What dietary facts should I remember for future dinners?",
+          "must_contain": [
+            "allergic to peanuts",
+            "drinks oat milk"
+          ],
+          "must_not_contain": [
+            "small bakery near the park",
+            "move dinner to Friday",
+            "Thanks",
+            "Okay"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "apartment-chat-logistics-facts",
+    "description": "A long apartment logistics chat should keep recurring operational facts and ignore one-off noisy chatter.",
+    "annotation_notes": "Manual annotation: this is a WhatsApp-style apartment thread. The storage-room key fact and recurring rent-payment instruction are durable; plumber chatter and short acknowledgements are not.",
+    "namespace_mode": "isolated",
+    "agent_name": "home-ops",
+    "session_id": "dialogue-apartment-logistics",
+    "dialogue": [
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Temporary note: call the plumber later today if the kitchen sink keeps dripping."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Got it."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Useful long-term fact: the blue key opens the storage room in the basement."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "user_input",
+        "space_hint": "project-space",
+        "role": "user",
+        "content": "Recurring reminder: rent should be paid on the 3rd of each month by bank transfer to the landlord."
+      },
+      {
+        "event_type": "conversation_turn",
+        "event_origin": "agent_output",
+        "space_hint": "project-space",
+        "role": "assistant",
+        "content": "Thanks."
+      }
+    ],
+    "expectations": {
+      "long_term": {
+        "must_contain": [
+          "blue key opens the storage room",
+          "paid on the 3rd of each month by bank transfer"
+        ],
+        "must_not_contain": [
+          "call the plumber later today",
+          "Got it",
+          "Thanks"
+        ]
+      },
+      "audit": {
+        "must_include_actions": [
+          "memory_unit_created",
+          "memory_candidate_demoted_session_only"
+        ],
+        "must_include_reasons": [
+          "temporary_scratch_not_durable",
+          "assistant_ack_not_durable"
+        ]
+      },
+      "recall_checks": [
+        {
+          "session_id": "dialogue-apartment-logistics-recall",
+          "query": "Which key opens the storage room?",
+          "must_contain": [
+            "blue key opens the storage room"
+          ],
+          "must_not_contain": [
+            "call the plumber later today",
+            "Got it",
+            "Thanks"
+          ]
+        },
+        {
+          "session_id": "dialogue-apartment-logistics-recall",
+          "query": "How should rent be paid each month?",
+          "must_contain": [
+            "paid on the 3rd of each month by bank transfer"
+          ],
+          "must_not_contain": [
+            "call the plumber later today",
+            "Got it",
+            "Thanks"
+          ]
+        }
+      ]
+    }
   }
 ]
