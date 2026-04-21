@@ -52,3 +52,7 @@ class LoadBenchmarkTests(unittest.TestCase):
         self.assertGreaterEqual(report["latency_ms"]["avg"], 0.0)
         self.assertGreaterEqual(report["selected_count_mean"], 1.0)
         self.assertGreaterEqual(report["brief_chars_mean"], 1.0)
+        self.assertIn("candidate_fetch", report["phase_avg_latency_ms"])
+        self.assertIn("ranking", report["phase_avg_latency_ms"])
+        self.assertGreaterEqual(report["phase_avg_latency_ms"]["candidate_fetch"], 0.0)
+        self.assertGreaterEqual(report["phase_share_percent"]["ranking"], 0.0)

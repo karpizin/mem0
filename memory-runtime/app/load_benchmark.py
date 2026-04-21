@@ -20,6 +20,39 @@ def _flatten_brief(brief: dict[str, list[str]]) -> str:
     return "\n".join(item for items in brief.values() for item in items)
 
 
+async def _snapshot_performance(client: httpx.AsyncClient) -> dict[str, object]:
+    response = await client.get("/v1/observability/stats")
+    return response.json()["performance"]
+
+
+def _phase_latency_delta(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> tuple[dict[str, float], dict[str, float]]:
+    before_totals = before.get("phase_latency_ms_total") or {}
+    after_totals = after.get("phase_latency_ms_total") or {}
+    before_requests = int(before.get("requests_observed_total") or 0)
+    after_requests = int(after.get("requests_observed_total") or 0)
+    observed_delta = max(after_requests - before_requests, 0)
+    phases = sorted(set(before_totals) | set(after_totals))
+    avg_phase_latency_ms: dict[str, float] = {}
+    phase_share_percent: dict[str, float] = {}
+    total_phase_latency = 0
+
+    phase_deltas: dict[str, int] = {}
+    for phase in phases:
+        delta = int(after_totals.get(phase, 0)) - int(before_totals.get(phase, 0))
+        phase_deltas[phase] = max(delta, 0)
+        total_phase_latency += phase_deltas[phase]
+
+    for phase in phases:
+        delta = phase_deltas[phase]
+        avg_phase_latency_ms[phase] = round((delta / observed_delta) if observed_delta else 0.0, 4)
+        phase_share_percent[phase] = round((delta / total_phase_latency * 100.0) if total_phase_latency else 0.0, 2)
+
+    return avg_phase_latency_ms, phase_share_percent
+
+
 async def _issue_recall(
     client: httpx.AsyncClient,
     *,
@@ -71,6 +104,7 @@ async def _run_concurrent_recalls(
     context_budget_tokens: int,
 ) -> dict[str, object]:
     async with client_factory() as client:
+        before_performance = await _snapshot_performance(client)
         all_results: list[dict[str, object]] = []
         started_at = time.perf_counter()
         for round_index in range(rounds):
@@ -87,12 +121,14 @@ async def _run_concurrent_recalls(
             ]
             all_results.extend(await asyncio.gather(*tasks))
         total_elapsed_seconds = max(time.perf_counter() - started_at, 0.0001)
+        after_performance = await _snapshot_performance(client)
 
     latencies = [int(item["latency_ms"]) for item in all_results]
     selected_counts = [int(item["selected_count"]) for item in all_results if item["ok"]]
     brief_chars = [int(item["brief_chars"]) for item in all_results if item["ok"]]
     failures = sum(1 for item in all_results if not item["ok"])
     total_requests = len(all_results)
+    phase_avg_latency_ms, phase_share_percent = _phase_latency_delta(before_performance, after_performance)
 
     return {
         "total_requests": total_requests,
@@ -102,6 +138,8 @@ async def _run_concurrent_recalls(
         "latency_ms": _summary(latencies),
         "selected_count": _summary(selected_counts),
         "brief_chars": _summary(brief_chars),
+        "phase_avg_latency_ms": phase_avg_latency_ms,
+        "phase_share_percent": phase_share_percent,
         "selected_count_mean": round(mean(selected_counts), 4) if selected_counts else 0.0,
         "brief_chars_mean": round(mean(brief_chars), 4) if brief_chars else 0.0,
     }

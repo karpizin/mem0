@@ -105,6 +105,9 @@ _RECALL_CANDIDATE_BUCKETS: Counter[str] = Counter()
 _RECALL_SELECTED_BUCKETS: Counter[str] = Counter()
 _RECALL_EXTERNAL_CANDIDATE_BUCKETS: Counter[str] = Counter()
 _RECALL_BRIEF_ITEM_BUCKETS: Counter[str] = Counter()
+_RECALL_PHASE_TOTALS: Counter[str] = Counter()
+_RECALL_PHASE_MAX: Counter[str] = Counter()
+_RECALL_PHASE_BUCKETS: Counter[tuple[str, str]] = Counter()
 _LOCK = Lock()
 
 _LATENCY_BUCKETS_MS = (50, 250, 1000, 5000, 10000)
@@ -143,6 +146,7 @@ def record_recall_observation(
     selected_count: int,
     external_candidate_count: int,
     brief_item_count: int,
+    phase_latencies_ms: dict[str, int] | None = None,
 ) -> None:
     with _LOCK:
         _RECALL_LATENCY_BUCKETS[_latency_bucket(latency_ms)] += 1
@@ -156,6 +160,10 @@ def record_recall_observation(
         _COUNTERS["recall_external_candidate_count_total"] += external_candidate_count
         _COUNTERS["recall_brief_item_count_total"] += brief_item_count
         _COUNTERS["recall_latency_ms_max"] = max(_COUNTERS["recall_latency_ms_max"], latency_ms)
+        for phase, value in sorted((phase_latencies_ms or {}).items()):
+            _RECALL_PHASE_TOTALS[phase] += value
+            _RECALL_PHASE_MAX[phase] = max(_RECALL_PHASE_MAX[phase], value)
+            _RECALL_PHASE_BUCKETS[(phase, _latency_bucket(value))] += 1
 
 
 def record_mcp_resource_read(*, resource_name: str, status: str) -> None:
@@ -189,6 +197,11 @@ def snapshot_recall_metrics() -> dict[str, object]:
         selected_total = int(_COUNTERS.get("recall_selected_count_total", 0))
         external_total = int(_COUNTERS.get("recall_external_candidate_count_total", 0))
         brief_total = int(_COUNTERS.get("recall_brief_item_count_total", 0))
+        phase_totals = dict(sorted(_RECALL_PHASE_TOTALS.items()))
+        phase_max = dict(sorted(_RECALL_PHASE_MAX.items()))
+        phase_buckets: dict[str, dict[str, int]] = {}
+        for (phase, bucket), value in sorted(_RECALL_PHASE_BUCKETS.items()):
+            phase_buckets.setdefault(phase, {})[bucket] = value
         return {
             "requests_observed_total": observed,
             "latency_buckets_ms": dict(sorted(_RECALL_LATENCY_BUCKETS.items())),
@@ -198,6 +211,13 @@ def snapshot_recall_metrics() -> dict[str, object]:
             "brief_item_buckets": dict(sorted(_RECALL_BRIEF_ITEM_BUCKETS.items())),
             "latency_ms_total": latency_total,
             "latency_ms_max": int(_COUNTERS.get("recall_latency_ms_max", 0)),
+            "phase_latency_ms_total": phase_totals,
+            "phase_latency_ms_max": phase_max,
+            "phase_latency_buckets_ms": phase_buckets,
+            "phase_avg_latency_ms": {
+                phase: round((total / observed) if observed else 0.0, 4)
+                for phase, total in phase_totals.items()
+            },
             "avg_candidate_count": round((candidate_total / observed) if observed else 0.0, 4),
             "avg_selected_count": round((selected_total / observed) if observed else 0.0, 4),
             "avg_external_candidate_count": round((external_total / observed) if observed else 0.0, 4),
@@ -227,6 +247,9 @@ def reset_metrics() -> None:
         _RECALL_SELECTED_BUCKETS.clear()
         _RECALL_EXTERNAL_CANDIDATE_BUCKETS.clear()
         _RECALL_BRIEF_ITEM_BUCKETS.clear()
+        _RECALL_PHASE_TOTALS.clear()
+        _RECALL_PHASE_MAX.clear()
+        _RECALL_PHASE_BUCKETS.clear()
 
 
 def render_prometheus_metrics(
@@ -344,6 +367,24 @@ def render_prometheus_metrics(
     lines.append("# HELP memory_runtime_recall_latency_ms_max Maximum observed recall latency in milliseconds.")
     lines.append("# TYPE memory_runtime_recall_latency_ms_max gauge")
     lines.append(f'memory_runtime_recall_latency_ms_max {int(recall_metrics.get("latency_ms_max", 0))}')
+
+    lines.append("# HELP memory_runtime_recall_phase_latency_ms_total Total recall latency by internal phase in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_phase_latency_ms_total counter")
+    for phase, value in sorted((recall_metrics.get("phase_latency_ms_total") or {}).items()):
+        lines.append(f'memory_runtime_recall_phase_latency_ms_total{{phase="{phase}"}} {int(value)}')
+
+    lines.append("# HELP memory_runtime_recall_phase_latency_ms_max Maximum observed recall latency by internal phase in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_phase_latency_ms_max gauge")
+    for phase, value in sorted((recall_metrics.get("phase_latency_ms_max") or {}).items()):
+        lines.append(f'memory_runtime_recall_phase_latency_ms_max{{phase="{phase}"}} {int(value)}')
+
+    lines.append("# HELP memory_runtime_recall_phase_latency_bucket_total Recall phase latency bucket counts in milliseconds.")
+    lines.append("# TYPE memory_runtime_recall_phase_latency_bucket_total counter")
+    for phase, buckets in sorted((recall_metrics.get("phase_latency_buckets_ms") or {}).items()):
+        for bucket, value in sorted(buckets.items()):
+            lines.append(
+                f'memory_runtime_recall_phase_latency_bucket_total{{phase="{phase}",bucket_ms="{bucket}"}} {value}'
+            )
 
     lines.append("# HELP memory_runtime_promotion_decision_total Promotion decisions grouped by outcome and reason.")
     lines.append("# TYPE memory_runtime_promotion_decision_total counter")

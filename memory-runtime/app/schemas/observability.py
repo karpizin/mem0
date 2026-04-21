@@ -29,6 +29,10 @@ class RecallPerformanceStats(BaseModel):
     brief_item_buckets: dict[str, int] = Field(default_factory=dict)
     latency_ms_total: int = 0
     latency_ms_max: int = 0
+    phase_latency_ms_total: dict[str, int] = Field(default_factory=dict)
+    phase_latency_ms_max: dict[str, int] = Field(default_factory=dict)
+    phase_latency_buckets_ms: dict[str, dict[str, int]] = Field(default_factory=dict)
+    phase_avg_latency_ms: dict[str, float] = Field(default_factory=dict)
     avg_candidate_count: float = 0.0
     avg_selected_count: float = 0.0
     avg_external_candidate_count: float = 0.0

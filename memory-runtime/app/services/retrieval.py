@@ -114,6 +114,7 @@ class RetrievalService:
 
     def recall(self, payload: RecallRequest) -> RecallResponse:
         started_at = monotonic_timer()
+        phase_latencies_ms: dict[str, int] = {}
         namespace = self.namespaces.get_by_id(payload.namespace_id)
         if namespace is None:
             raise LookupError(f"Namespace '{payload.namespace_id}' not found")
@@ -132,33 +133,50 @@ class RetrievalService:
             context_budget_tokens=payload.context_budget_tokens,
             query=payload.query,
         )
+        phase_started_at = monotonic_timer()
         rows = self.episodes.list_for_recall(
             namespace_id=payload.namespace_id,
             agent_id=payload.agent_id,
             session_id=payload.session_id,
             space_types=space_filters,
         )
+        phase_latencies_ms["candidate_fetch"] = elapsed_milliseconds(phase_started_at)
+
+        phase_started_at = monotonic_timer()
         feedback_scores = self.audit.feedback_score_by_entity(
             namespace_id=payload.namespace_id,
             entity_type="episode",
             entity_ids=[episode.id for episode, _space_type in rows],
         )
+        phase_latencies_ms["feedback_lookup"] = elapsed_milliseconds(phase_started_at)
 
+        phase_started_at = monotonic_timer()
         candidates = [self._candidate_from_episode(episode, space_type, feedback_scores) for episode, space_type in rows]
+        phase_latencies_ms["candidate_build"] = elapsed_milliseconds(phase_started_at)
+
+        phase_started_at = monotonic_timer()
         external_candidates = self._external_candidates(
             query=payload.query,
             namespace_id=payload.namespace_id,
             agent_id=payload.agent_id,
         )
         candidates.extend(external_candidates)
+        phase_latencies_ms["external_lookup"] = elapsed_milliseconds(phase_started_at)
 
+        phase_started_at = monotonic_timer()
         ranked = self.rank_candidates(payload.query, candidates, payload.session_id)
+        phase_latencies_ms["ranking"] = elapsed_milliseconds(phase_started_at)
+
+        phase_started_at = monotonic_timer()
         selected = self.select_candidates_for_brief(
             payload.query,
             ranked,
             active_session_id=payload.session_id,
             context_budget_tokens=payload.context_budget_tokens,
         )
+        phase_latencies_ms["selection"] = elapsed_milliseconds(phase_started_at)
+
+        phase_started_at = monotonic_timer()
         brief_dict = self.build_memory_brief(selected)
         selected_space_types = self.collect_selected_space_types(selected)
         selected_episode_ids = self.collect_selected_episode_ids(selected)
@@ -167,32 +185,9 @@ class RetrievalService:
             selected,
             active_session_id=payload.session_id,
         )
+        phase_latencies_ms["brief_build"] = elapsed_milliseconds(phase_started_at)
 
         selected_count = sum(len(items) for items in brief_dict.values())
-        increment_metric("recall_requests_total")
-        increment_metric("recall_candidates_total", len(candidates))
-        increment_metric("recall_selected_total", selected_count)
-        record_recall_observation(
-            latency_ms=elapsed_milliseconds(started_at),
-            candidate_count=len(candidates),
-            selected_count=selected_count,
-            external_candidate_count=len(external_candidates),
-            brief_item_count=selected_count,
-        )
-        log_event(
-            logger,
-            "retrieval.completed",
-            namespace_id=payload.namespace_id,
-            agent_id=payload.agent_id,
-            session_id=payload.session_id,
-            candidate_count=len(candidates),
-            external_candidate_count=len(external_candidates),
-            selected_count=selected_count,
-            selected_episode_ids=selected_episode_ids,
-            selected_space_types=selected_space_types,
-            slot_counts={slot: len(items) for slot, items in brief_dict.items()},
-            latency_ms=elapsed_milliseconds(started_at),
-        )
         response = RecallResponse(
             brief=MemoryBrief(**brief_dict),
             trace=RecallTrace(
@@ -218,7 +213,36 @@ class RetrievalService:
                 "trace": response.trace.model_dump(),
             },
         )
+        phase_started_at = monotonic_timer()
         self.session.commit()
+        phase_latencies_ms["audit_commit"] = elapsed_milliseconds(phase_started_at)
+        total_latency_ms = elapsed_milliseconds(started_at)
+        increment_metric("recall_requests_total")
+        increment_metric("recall_candidates_total", len(candidates))
+        increment_metric("recall_selected_total", selected_count)
+        record_recall_observation(
+            latency_ms=total_latency_ms,
+            candidate_count=len(candidates),
+            selected_count=selected_count,
+            external_candidate_count=len(external_candidates),
+            brief_item_count=selected_count,
+            phase_latencies_ms=phase_latencies_ms,
+        )
+        log_event(
+            logger,
+            "retrieval.completed",
+            namespace_id=payload.namespace_id,
+            agent_id=payload.agent_id,
+            session_id=payload.session_id,
+            candidate_count=len(candidates),
+            external_candidate_count=len(external_candidates),
+            selected_count=selected_count,
+            selected_episode_ids=selected_episode_ids,
+            selected_space_types=selected_space_types,
+            slot_counts={slot: len(items) for slot, items in brief_dict.items()},
+            phase_latencies_ms=phase_latencies_ms,
+            latency_ms=total_latency_ms,
+        )
         return response
 
     @classmethod

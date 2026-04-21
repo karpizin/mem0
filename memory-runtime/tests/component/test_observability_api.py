@@ -224,6 +224,10 @@ class ObservabilityApiTests(unittest.TestCase):
         self.assertTrue(performance["selected_buckets"])
         self.assertGreaterEqual(performance["avg_candidate_count"], 1.0)
         self.assertGreaterEqual(performance["avg_selected_count"], 1.0)
+        self.assertIn("candidate_fetch", performance["phase_avg_latency_ms"])
+        self.assertIn("ranking", performance["phase_avg_latency_ms"])
+        self.assertIn("audit_commit", performance["phase_latency_ms_total"])
+        self.assertTrue(performance["phase_latency_buckets_ms"]["candidate_fetch"])
 
         metrics_response = self.client.get("/metrics")
         self.assertEqual(metrics_response.status_code, 200)
@@ -232,6 +236,8 @@ class ObservabilityApiTests(unittest.TestCase):
         self.assertIn("memory_runtime_recall_candidate_bucket_total", body)
         self.assertIn("memory_runtime_recall_selected_bucket_total", body)
         self.assertIn("memory_runtime_recall_latency_ms_total", body)
+        self.assertIn("memory_runtime_recall_phase_latency_ms_total{phase=\"candidate_fetch\"}", body)
+        self.assertIn("memory_runtime_recall_phase_latency_bucket_total{phase=\"candidate_fetch\"", body)
 
     def test_observability_quality_stats_report_promotion_and_rescue_breakdowns(self) -> None:
         self.client.post(

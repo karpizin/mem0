@@ -238,3 +238,36 @@ The concurrent recall story now looks like this:
 - Python-side hot-path work was a real and important bottleneck
 - storage/query tuning gives additional headroom, especially on smaller large-pool loads and latency tails
 - the next optimization frontier is increasingly about DB/session contention and query shape under true parallel load, especially for `1000+` candidate pools
+
+## Recall Phase Breakdown
+
+To avoid guessing at the next bottleneck, the concurrent load benchmark now also captures average internal recall phase timings per request.
+
+### `8-way` Concurrent Load, `balanced_runtime`
+
+| Memories | Avg latency | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `808.45ms` | `459.175ms` | `64.825ms` | `53.55ms` | `27.5ms` | `71.35ms` | `16.9ms` |
+| `1000` | `1588.65ms` | `947.825ms` | `124.55ms` | `81.375ms` | `105.3ms` | `144.925ms` | `30.55ms` |
+
+### Share Of Internal Recall Work
+
+| Memories | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `66.23%` | `9.35%` | `7.72%` | `3.97%` | `10.29%` | `2.44%` |
+| `1000` | `66.07%` | `8.68%` | `5.67%` | `7.34%` | `10.10%` | `2.13%` |
+
+### Interpretation
+
+- the dominant concurrent bottleneck is now clearly `candidate_fetch`, not ranking or brief assembly
+- that holds at both `500` and `1000` memories, which strongly suggests the next real win is in `episodes.list_for_recall()` and its DB/session behavior under parallel load
+- `candidate_build` and `selection` are the next-largest slices, but they are still much smaller than fetch pressure
+- `feedback_lookup` is no longer dominant after the fast-exit change, though it remains measurable at larger pool sizes
+- `audit_commit` is visible but relatively small, so it should not be the first optimization target
+
+### Updated Next Step
+
+The most promising next optimization now is:
+
+- reduce `candidate_fetch` pressure in `EpisodeRepository.list_for_recall()`
+- then reassess whether we still need deeper Python-side reductions in candidate construction and selection
