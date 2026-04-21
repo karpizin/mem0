@@ -9,6 +9,7 @@ from app.repositories.episodes import EpisodeRepository
 from app.repositories.memory_spaces import MemorySpaceRepository
 from app.repositories.memory_units import MemoryUnitRepository
 from app.repositories.namespaces import NamespaceRepository
+from app.sensitivity import detect_sensitive_reason, format_sensitive_text, should_mask_sensitive_outputs
 from app.schemas.adapters import (
     AdapterBootstrapRequest,
     AdapterBootstrapResponse,
@@ -37,6 +38,8 @@ class _AdapterMemoryCandidate:
     created_at: object
     updated_at: object
     metadata: dict[str, str | int | float | bool | None]
+    is_sensitive: bool = False
+    sensitivity_reason: str | None = None
 
 
 class AdapterService:
@@ -170,6 +173,8 @@ class AdapterService:
                     created_at=candidate.created_at,
                     session_id=payload.session_id if payload.session_id and candidate.resource_kind == "episode" else None,
                     usefulness_score=0.0,
+                    is_sensitive=candidate.is_sensitive,
+                    sensitivity_reason=candidate.sensitivity_reason,
                 )
                 for candidate in candidates
             ],
@@ -197,7 +202,7 @@ class AdapterService:
             results=[
                 AdapterMemoryRead(
                     id=candidate.id,
-                    memory=candidate.memory,
+                    memory=self._display_memory(candidate),
                     resource_kind=candidate.resource_kind,
                     space_type=candidate.space_type,
                     score=score_by_id.get(candidate.id),
@@ -233,7 +238,7 @@ class AdapterService:
             results=[
                 AdapterMemoryRead(
                     id=candidate.id,
-                    memory=candidate.memory,
+                    memory=self._display_memory(candidate),
                     resource_kind=candidate.resource_kind,
                     space_type=candidate.space_type,
                     score=candidate.score,
@@ -263,7 +268,7 @@ class AdapterService:
             raise LookupError(f"Memory '{memory_id}' not found")
         return AdapterMemoryRead(
             id=candidate.id,
-            memory=candidate.memory,
+            memory=self._display_memory(candidate),
             resource_kind=candidate.resource_kind,
             space_type=candidate.space_type,
             score=candidate.score,
@@ -342,7 +347,16 @@ class AdapterService:
                 score=None,
                 created_at=episode.created_at,
                 updated_at=episode.created_at,
-                metadata={"session_id": episode.session_id, "space_type": space_type},
+                metadata={
+                    "session_id": episode.session_id,
+                    "space_type": space_type,
+                    "sensitive": detect_sensitive_reason(episode.raw_text) is not None,
+                    "sensitivity_reason": detect_sensitive_reason(episode.raw_text),
+                    "masked": detect_sensitive_reason(episode.raw_text) is not None
+                    and should_mask_sensitive_outputs(),
+                },
+                is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
+                sensitivity_reason=detect_sensitive_reason(episode.raw_text),
             )
             for episode, space_type in rows
         ]
@@ -368,7 +382,16 @@ class AdapterService:
                 score=None,
                 created_at=memory.created_at,
                 updated_at=memory.updated_at,
-                metadata={"space_type": space_type, "kind": memory.kind, "scope": memory.scope},
+                metadata={
+                    "space_type": space_type,
+                    "kind": memory.kind,
+                    "scope": memory.scope,
+                    "sensitive": memory.is_sensitive,
+                    "sensitivity_reason": memory.sensitivity_reason,
+                    "masked": memory.is_sensitive and should_mask_sensitive_outputs(),
+                },
+                is_sensitive=memory.is_sensitive,
+                sensitivity_reason=memory.sensitivity_reason,
             )
             for memory, space_type in memory_rows
         ]
@@ -392,7 +415,16 @@ class AdapterService:
                     score=None,
                     created_at=memory.created_at,
                     updated_at=memory.updated_at,
-                    metadata={"space_type": space_type, "kind": memory.kind, "scope": memory.scope},
+                    metadata={
+                        "space_type": space_type,
+                        "kind": memory.kind,
+                        "scope": memory.scope,
+                        "sensitive": memory.is_sensitive,
+                        "sensitivity_reason": memory.sensitivity_reason,
+                        "masked": memory.is_sensitive and should_mask_sensitive_outputs(),
+                    },
+                    is_sensitive=memory.is_sensitive,
+                    sensitivity_reason=memory.sensitivity_reason,
                 )
 
         episode = self.episodes.get_by_id(memory_id)
@@ -411,7 +443,24 @@ class AdapterService:
             score=None,
             created_at=episode.created_at,
             updated_at=episode.created_at,
-            metadata={"session_id": episode.session_id, "space_type": space_type},
+            metadata={
+                "session_id": episode.session_id,
+                "space_type": space_type,
+                "sensitive": detect_sensitive_reason(episode.raw_text) is not None,
+                "sensitivity_reason": detect_sensitive_reason(episode.raw_text),
+                "masked": detect_sensitive_reason(episode.raw_text) is not None
+                and should_mask_sensitive_outputs(),
+            },
+            is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
+            sensitivity_reason=detect_sensitive_reason(episode.raw_text),
+        )
+
+    @staticmethod
+    def _display_memory(candidate: _AdapterMemoryCandidate) -> str:
+        return format_sensitive_text(
+            candidate.memory,
+            is_sensitive=candidate.is_sensitive,
+            masked=candidate.is_sensitive and should_mask_sensitive_outputs(),
         )
 
     @staticmethod

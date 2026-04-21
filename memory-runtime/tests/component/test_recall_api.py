@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import Base, get_engine, reset_database_caches
 from app.main import create_app
+from app.workers.runner import WorkerRunner
 
 
 class RecallApiTests(unittest.TestCase):
@@ -234,3 +235,89 @@ class RecallApiTests(unittest.TestCase):
         updated_payload = after_feedback.json()
         self.assertTrue(updated_payload["brief"]["active_project_context"])
         self.assertIn("ledger table", updated_payload["brief"]["active_project_context"][0])
+
+
+class SensitiveRecallPolicyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "sensitive_recall.db")
+        os.environ["MEMORY_RUNTIME_POSTGRES_DSN"] = f"sqlite+pysqlite:///{self.db_path}"
+        os.environ["MEMORY_RUNTIME_AUTO_CREATE_TABLES"] = "true"
+        os.environ["MEMORY_RUNTIME_ENV"] = "test"
+        os.environ["MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY"] = "mark"
+        os.environ["MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS"] = "true"
+        get_settings.cache_clear()
+        reset_database_caches()
+        Base.metadata.create_all(bind=get_engine())
+        self.client = TestClient(create_app())
+
+        namespace_response = self.client.post(
+            "/v1/namespaces",
+            json={
+                "name": "openclaw:agent:sensitive",
+                "mode": "isolated",
+                "source_systems": ["openclaw"],
+            },
+        )
+        self.namespace_id = namespace_response.json()["id"]
+        agent_response = self.client.post(
+            f"/v1/namespaces/{self.namespace_id}/agents",
+            json={
+                "name": "planner",
+                "source_system": "openclaw"
+            },
+        )
+        self.agent_id = agent_response.json()["id"]
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+        for key in (
+            "MEMORY_RUNTIME_POSTGRES_DSN",
+            "MEMORY_RUNTIME_AUTO_CREATE_TABLES",
+            "MEMORY_RUNTIME_ENV",
+            "MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY",
+            "MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS",
+        ):
+            os.environ.pop(key, None)
+        get_settings.cache_clear()
+        reset_database_caches()
+
+    def test_recall_masks_sensitive_memory_when_policy_is_mark(self) -> None:
+        response = self.client.post(
+            "/v1/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_sensitive_1",
+                "source_system": "openclaw",
+                "event_type": "conversation_turn",
+                "space_hint": "project-space",
+                "messages": [
+                    {"role": "user", "content": "The Wi-Fi password is maple-4821 for the apartment router."}
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        WorkerRunner.run_pending_jobs()
+
+        recall = self.client.post(
+            "/v1/recall",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_sensitive_recall",
+                "query": "What is the Wi-Fi password for the apartment router?",
+                "context_budget_tokens": 600,
+            },
+        )
+
+        self.assertEqual(recall.status_code, 200)
+        payload = recall.json()
+        flattened = " ".join(item for items in payload["brief"].values() for item in items)
+        self.assertIn("[sensitive] hidden content", flattened)
+        self.assertNotIn("maple-4821", flattened)
+        self.assertTrue(payload["trace"]["selection_explanations"])
+        explanation = payload["trace"]["selection_explanations"][0]
+        self.assertTrue(explanation["sensitive"])
+        self.assertTrue(explanation["masked"])
+        self.assertEqual(explanation["sensitivity_reason"], "privacy_sensitive_secret")

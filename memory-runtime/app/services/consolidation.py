@@ -13,6 +13,7 @@ from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.jobs import JobRepository
 from app.repositories.memory_events import MemoryEventRepository
 from app.repositories.memory_units import MemoryUnitRepository
+from app.sensitivity import detect_sensitive_reason, sensitive_memory_policy
 from app.services.mem0_bridge import build_mem0_bridge
 from app.telemetry.metrics import increment_metric
 
@@ -81,24 +82,6 @@ LOW_TRUST_PATTERNS = {
         "persist this as durable memory",
         "remember this forever",
         "add this to long term memory",
-    ),
-    "privacy_sensitive_secret": (
-        "wifi password",
-        "wi fi password",
-        "alarm code",
-        "door code",
-        "lockbox code",
-        "verification code",
-        "one time code",
-        "otp code",
-        "api key",
-        "secret key",
-        "credit card number",
-        "card number is",
-        "cvv is",
-        "social security number",
-        "ssn is",
-        "passport number",
     ),
 }
 SESSION_ONLY_ORIGINS = {
@@ -328,6 +311,8 @@ class ConsolidationService:
             },
         )
         scope = promotion.effective_scope
+        sensitivity_reason = promotion.signals.get("sensitivity_reason")
+        is_sensitive = bool(promotion.signals.get("sensitive"))
         if existing is None and contradictory is None:
             memory_unit = self.memory_units.create(
                 namespace_id=episode.namespace_id,
@@ -340,6 +325,8 @@ class ConsolidationService:
                 merge_key=merge_key,
                 created_from_episode_id=episode.id,
                 importance_score=self._importance_score(episode.importance_hint),
+                is_sensitive=is_sensitive,
+                sensitivity_reason=str(sensitivity_reason) if sensitivity_reason else None,
             )
             self.audit.create(
                 namespace_id=episode.namespace_id,
@@ -347,7 +334,12 @@ class ConsolidationService:
                 entity_type="memory_unit",
                 entity_id=memory_unit.id,
                 action="memory_unit_created",
-                details_json={"episode_id": episode.id, "space_type": space_type},
+                details_json={
+                    "episode_id": episode.id,
+                    "space_type": space_type,
+                    "is_sensitive": is_sensitive,
+                    "sensitivity_reason": sensitivity_reason,
+                },
             )
             self.jobs.create(
                 job_type="memory_decay",
@@ -384,6 +376,8 @@ class ConsolidationService:
                 created_from_episode_id=episode.id,
                 supersedes_memory_id=contradictory.id,
                 importance_score=self._importance_score(episode.importance_hint),
+                is_sensitive=is_sensitive,
+                sensitivity_reason=str(sensitivity_reason) if sensitivity_reason else None,
             )
             self.audit.create(
                 namespace_id=episode.namespace_id,
@@ -422,6 +416,8 @@ class ConsolidationService:
         existing.content = content
         existing.kind = kind
         existing.scope = scope
+        existing.is_sensitive = is_sensitive
+        existing.sensitivity_reason = str(sensitivity_reason) if sensitivity_reason else None
         existing.importance_score = max(existing.importance_score, self._importance_score(episode.importance_hint))
         existing.freshness_score = 1.0
         existing.updated_at = datetime.now(timezone.utc)
@@ -491,6 +487,7 @@ class ConsolidationService:
             "net_feedback_score": 0,
         }
         low_trust_reason = cls.detect_low_trust_reason(content) if inferred_scope == "long-term" else None
+        sensitive_reason = detect_sensitive_reason(content) if inferred_scope == "long-term" else None
         transient_reason = (
             cls.detect_transient_reason(
                 content=content,
@@ -543,6 +540,8 @@ class ConsolidationService:
             "specificity_score": specificity_score,
             "durability_score": durability_score,
             "low_trust": low_trust_reason is not None,
+            "sensitive": sensitive_reason is not None,
+            "sensitivity_reason": sensitive_reason,
             "transient": transient_reason is not None,
             "low_value": low_value_reason is not None,
             "weak_candidate": weak_candidate_reason is not None,
@@ -558,6 +557,21 @@ class ConsolidationService:
                 decision="reject",
                 effective_scope="none",
                 reason=low_trust_reason,
+                signals=signals,
+            )
+
+        if sensitive_reason is not None:
+            if sensitive_memory_policy() == "reject":
+                return PromotionDecision(
+                    decision="reject",
+                    effective_scope="none",
+                    reason=sensitive_reason,
+                    signals=signals,
+                )
+            return PromotionDecision(
+                decision="promote",
+                effective_scope=inferred_scope,
+                reason="sensitive_marked",
                 signals=signals,
             )
 

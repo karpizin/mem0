@@ -28,6 +28,8 @@ class Settings:
     mem0_base_url: str | None = None
     mem0_api_key: str | None = None
     mem0_timeout_seconds: float = 5.0
+    sensitive_memory_policy: str = "reject"
+    mask_sensitive_memory_outputs: bool = True
 
     @property
     def database_url(self) -> str:
@@ -36,6 +38,9 @@ class Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    sensitive_policy = os.getenv("MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY", "reject").strip().lower()
+    if sensitive_policy not in {"reject", "mark"}:
+        sensitive_policy = "reject"
     return Settings(
         app_name=os.getenv("MEMORY_RUNTIME_APP_NAME", "Agent Memory Runtime"),
         environment=os.getenv("MEMORY_RUNTIME_ENV", "development"),
@@ -55,4 +60,9 @@ def get_settings() -> Settings:
         mem0_base_url=os.getenv("MEMORY_RUNTIME_MEM0_BASE_URL"),
         mem0_api_key=os.getenv("MEMORY_RUNTIME_MEM0_API_KEY"),
         mem0_timeout_seconds=float(os.getenv("MEMORY_RUNTIME_MEM0_TIMEOUT_SECONDS", "5.0")),
+        sensitive_memory_policy=sensitive_policy,
+        mask_sensitive_memory_outputs=_to_bool(
+            os.getenv("MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS"),
+            default=True,
+        ),
     )

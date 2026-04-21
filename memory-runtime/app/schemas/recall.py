@@ -24,8 +24,12 @@ class RecallSelectionExplanation(BaseModel):
     episode_id: str
     space_type: str
     slot: str
+    display_text: str
     decisive_signal: str
     why: str
+    sensitive: bool = False
+    sensitivity_reason: str | None = None
+    masked: bool = False
 
 
 class RecallTrace(BaseModel):

@@ -28,6 +28,8 @@ class MemoryUnitRepository:
         confidence_score: float = 0.8,
         freshness_score: float = 1.0,
         durability_score: float = 0.8,
+        is_sensitive: bool = False,
+        sensitivity_reason: str | None = None,
     ) -> MemoryUnit:
         memory = MemoryUnit(
             namespace_id=namespace_id,
@@ -44,6 +46,8 @@ class MemoryUnitRepository:
             confidence_score=confidence_score,
             freshness_score=freshness_score,
             durability_score=durability_score,
+            is_sensitive=is_sensitive,
+            sensitivity_reason=sensitivity_reason,
         )
         self.session.add(memory)
         self.session.flush()

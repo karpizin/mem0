@@ -47,11 +47,16 @@ cp .env.example .env
 - `MEMORY_RUNTIME_MEM0_BRIDGE_ENABLED`
 - `MEMORY_RUNTIME_MEM0_BASE_URL`
 - `MEMORY_RUNTIME_MEM0_API_KEY`
+- `MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY`
+- `MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS`
 
 По умолчанию локальный scaffold использует SQLite-файл для безопасного старта без внешней БД.
 Для Docker и реального runtime используется явный Postgres DSN из `.env`.
 `mem0 bridge` по умолчанию выключен и включается только явной конфигурацией.
 Локальные pilot/eval CLI теперь сначала используют `memory-runtime/.venv/bin/python`, если он существует, и только потом fallback-ятся на системный Python.
+Для sensitive memory policy сейчас поддерживаются два режима:
+- `reject` — безопасный режим по умолчанию; obvious secrets не попадают в durable memory
+- `mark` — sensitive facts можно сохранить, но они помечаются как sensitive и по умолчанию маскируются в recall/adapters как `[sensitive] hidden content`
 
 ## Установка dev-зависимостей
 
@@ -134,6 +139,9 @@ Consolidation baseline теперь умеет:
 - canonicalize phrasing variants для более устойчивого merge
 - supersede явные противоречащие long-term memories в пределах одного пространства вместо наивного сосуществования конфликтующих фактов
  - отклонять low-trust prompt-like и memory-poisoning candidates до их попадания в long-term memory
+ - обрабатывать obvious secrets через configurable policy:
+   - `reject` по умолчанию
+   - или `mark`, когда sensitive memories сохраняются с `is_sensitive/sensitivity_reason` и маскируются в выдаче
 В shared namespace `shared-space` доступен межагентно, при этом `agent-core` остается приватным.
 `/metrics` отдает Prometheus-compatible экспорт counters и job gauges, а `/v1/observability/stats` дает JSON-срез для локальной диагностики и dashboard bootstrap.
 Worker-derived operational counters (`jobs_*`, `consolidation_*`, `lifecycle_*`) теперь считаются из shared DB state (`jobs` и `audit_log`), а не только из process-local памяти.
@@ -194,6 +202,9 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - recall trace explainability with decisive selection signals
 - golden compactness regression for low-budget memory briefs
 - dialogue-based memory eval with manually annotated curated conversations, checking long-term promotion, demotion/rejection audit trail, and recall quality together
+- configurable sensitive-memory policy coverage for both:
+  - default `reject` mode
+  - optional `mark + mask` mode for personal-memory use cases
 - MCP Streamable HTTP facade with tools/resources/prompts contract, safe write tools, and transport validation
 - отдельный MCP smoke runner для быстрой проверки guarded write/read flow на живом контуре
 - MCP edge-case coverage для `shared-space` writes, приватности private `project-space` и guardrails на `agent-core`

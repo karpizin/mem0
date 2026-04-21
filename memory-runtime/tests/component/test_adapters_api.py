@@ -205,6 +205,81 @@ class AdaptersApiTests(unittest.TestCase):
         self.assertNotIn("bulletless status format", flattened_brief)
         self.assertIn("shared-space", payload["trace"]["selected_space_types"])
 
+
+class SensitiveAdapterPolicyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "adapters_sensitive.db")
+        os.environ["MEMORY_RUNTIME_POSTGRES_DSN"] = f"sqlite+pysqlite:///{self.db_path}"
+        os.environ["MEMORY_RUNTIME_AUTO_CREATE_TABLES"] = "true"
+        os.environ["MEMORY_RUNTIME_ENV"] = "test"
+        os.environ["MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY"] = "mark"
+        os.environ["MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS"] = "true"
+        get_settings.cache_clear()
+        reset_database_caches()
+        Base.metadata.create_all(bind=get_engine())
+        self.client = TestClient(create_app())
+
+        namespace_response = self.client.post(
+            "/v1/namespaces",
+            json={
+                "name": "cluster:sensitive:isolated",
+                "mode": "isolated",
+                "source_systems": ["openclaw"],
+            },
+        )
+        self.namespace_id = namespace_response.json()["id"]
+        agent_response = self.client.post(
+            f"/v1/namespaces/{self.namespace_id}/agents",
+            json={"name": "planner", "source_system": "openclaw"},
+        )
+        self.agent_id = agent_response.json()["id"]
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+        for key in (
+            "MEMORY_RUNTIME_POSTGRES_DSN",
+            "MEMORY_RUNTIME_AUTO_CREATE_TABLES",
+            "MEMORY_RUNTIME_ENV",
+            "MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY",
+            "MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS",
+        ):
+            os.environ.pop(key, None)
+        get_settings.cache_clear()
+        reset_database_caches()
+
+    def test_adapter_masks_sensitive_memory_when_policy_is_mark(self) -> None:
+        event = self.client.post(
+            "/v1/adapters/openclaw/events",
+            json={
+                "namespace_id": self.namespace_id,
+                "agent_id": self.agent_id,
+                "session_id": "run_sensitive_adapter_1",
+                "event_type": "conversation_turn",
+                "space_hint": "project-space",
+                "messages": [
+                    {"role": "user", "content": "The API key is sk-live-12345-abcdef for the billing service."},
+                ],
+            },
+        )
+        self.assertEqual(event.status_code, 201)
+        WorkerRunner.run_pending_jobs()
+
+        listed = self.client.get(
+            f"/v1/adapters/openclaw/memories?namespace_id={self.namespace_id}&agent_id={self.agent_id}&limit=10"
+        )
+        self.assertEqual(listed.status_code, 200)
+        payload = listed.json()
+        self.assertTrue(payload["results"])
+        first = payload["results"][0]
+        self.assertIn("[sensitive] hidden content", first["memory"])
+        self.assertNotIn("sk-live-12345-abcdef", first["memory"])
+        self.assertTrue(first["metadata"]["sensitive"])
+        self.assertTrue(first["metadata"]["masked"])
+        self.assertEqual(first["metadata"]["sensitivity_reason"], "privacy_sensitive_secret")
+
+
+class AdaptersApiContractRegressionTests(AdaptersApiTests):
     def test_shared_namespace_recall_excludes_other_agents_private_project_context(self) -> None:
         self.client.post(
             "/v1/adapters/openclaw/events",

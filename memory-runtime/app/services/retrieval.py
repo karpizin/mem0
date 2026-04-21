@@ -12,6 +12,7 @@ from app.logging_utils import log_event
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.episodes import EpisodeRepository
 from app.repositories.namespaces import NamespaceRepository
+from app.sensitivity import detect_sensitive_reason, format_sensitive_text, should_mask_sensitive_outputs
 from app.schemas.recall import (
     MemoryBrief,
     RecallFeedbackRequest,
@@ -86,6 +87,8 @@ class RetrievalCandidate:
     created_at: datetime | str
     session_id: str | None
     usefulness_score: float = 0.0
+    is_sensitive: bool = False
+    sensitivity_reason: str | None = None
 
 
 class RetrievalService:
@@ -138,6 +141,8 @@ class RetrievalService:
                 created_at=episode.created_at,
                 session_id=episode.session_id,
                 usefulness_score=feedback_scores.get(episode.id, 0.0),
+                is_sensitive=detect_sensitive_reason(episode.raw_text) is not None,
+                sensitivity_reason=detect_sensitive_reason(episode.raw_text),
             )
             for episode, space_type in rows
         ]
@@ -339,7 +344,7 @@ class RetrievalService:
 
         seen = {key: set() for key in brief}
         for candidate in ranked_candidates:
-            item = f"{candidate.space_type}: {candidate.summary}"
+            item = cls._brief_item(candidate)
             slot = cls._slot_for_candidate(candidate)
             if item not in seen[slot]:
                 brief[slot].append(item)
@@ -382,11 +387,24 @@ class RetrievalService:
                     episode_id=candidate.episode_id,
                     space_type=candidate.space_type,
                     slot=slot,
+                    display_text=cls._brief_item(candidate),
                     decisive_signal=decisive_signal,
                     why=cls._explanation_text(slot=slot, decisive_signal=decisive_signal),
+                    sensitive=candidate.is_sensitive,
+                    sensitivity_reason=candidate.sensitivity_reason,
+                    masked=candidate.is_sensitive and should_mask_sensitive_outputs(),
                 )
             )
         return explanations
+
+    @staticmethod
+    def _brief_item(candidate: RetrievalCandidate) -> str:
+        if not candidate.is_sensitive:
+            return f"{candidate.space_type}: {candidate.summary}"
+        return (
+            f"{candidate.space_type}: "
+            f"{format_sensitive_text(candidate.raw_text, is_sensitive=True, masked=should_mask_sensitive_outputs())}"
+        )
 
     @staticmethod
     def _extract_event_type(summary: str) -> str:
@@ -596,4 +614,6 @@ class RetrievalService:
             created_at=datetime.now(timezone.utc),
             session_id=None,
             usefulness_score=0.0,
+            is_sensitive=False,
+            sensitivity_reason=None,
         )

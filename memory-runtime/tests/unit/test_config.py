@@ -17,6 +17,8 @@ class SettingsTests(unittest.TestCase):
             "MEMORY_RUNTIME_STALLED_JOB_AFTER_SECONDS",
             "MEMORY_RUNTIME_POSTGRES_DSN",
             "MEMORY_RUNTIME_REDIS_URL",
+            "MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY",
+            "MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS",
         ):
             os.environ.pop(key, None)
         get_settings.cache_clear()
@@ -40,6 +42,12 @@ class SettingsTests(unittest.TestCase):
                 postgres_dsn="sqlite+pysqlite:///./memory_runtime.db",
                 redis_url="redis://localhost:6379/0",
                 auto_create_tables=True,
+                mem0_bridge_enabled=False,
+                mem0_base_url=None,
+                mem0_api_key=None,
+                mem0_timeout_seconds=5.0,
+                sensitive_memory_policy="reject",
+                mask_sensitive_memory_outputs=True,
             ),
         )
 
@@ -54,6 +62,8 @@ class SettingsTests(unittest.TestCase):
         os.environ["MEMORY_RUNTIME_STALLED_JOB_AFTER_SECONDS"] = "45"
         os.environ["MEMORY_RUNTIME_POSTGRES_DSN"] = "postgresql://db/test"
         os.environ["MEMORY_RUNTIME_REDIS_URL"] = "redis://cache/1"
+        os.environ["MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY"] = "mark"
+        os.environ["MEMORY_RUNTIME_MASK_SENSITIVE_MEMORY_OUTPUTS"] = "false"
         get_settings.cache_clear()
 
         settings = get_settings()
@@ -68,3 +78,5 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.stalled_job_after_seconds, 45.0)
         self.assertEqual(settings.postgres_dsn, "postgresql://db/test")
         self.assertEqual(settings.redis_url, "redis://cache/1")
+        self.assertEqual(settings.sensitive_memory_policy, "mark")
+        self.assertFalse(settings.mask_sensitive_memory_outputs)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -31,6 +31,8 @@ class MemoryUnit(Base):
     access_count: Mapped[int] = mapped_column(Integer, default=0)
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="active", index=True)
+    is_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
+    sensitivity_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_from_episode_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("episodes.id"), nullable=True)
     supersedes_memory_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("memory_units.id"), nullable=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 
 
@@ -88,10 +89,10 @@ class ConsolidationServiceContractTests(unittest.TestCase):
 
         self.assertEqual(reason, "instruction_override")
 
-    def test_detect_low_trust_reason_flags_privacy_sensitive_secret(self) -> None:
-        from app.services.consolidation import ConsolidationService
+    def test_detect_sensitive_reason_flags_privacy_sensitive_secret(self) -> None:
+        from app.sensitivity import detect_sensitive_reason
 
-        reason = ConsolidationService.detect_low_trust_reason(
+        reason = detect_sensitive_reason(
             "The Wi-Fi password is maple-4821 for the apartment router."
         )
 
@@ -186,6 +187,31 @@ class ConsolidationServiceContractTests(unittest.TestCase):
         self.assertEqual(decision.decision, "reject")
         self.assertEqual(decision.reason, "privacy_sensitive_secret")
         self.assertEqual(decision.effective_scope, "none")
+
+    def test_evaluate_promotion_decision_marks_sensitive_secret_when_policy_allows(self) -> None:
+        from app.config import get_settings
+        from app.services.consolidation import ConsolidationService
+
+        os.environ["MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY"] = "mark"
+        get_settings.cache_clear()
+        try:
+            decision = ConsolidationService.evaluate_promotion_decision(
+                event_origin="user_input",
+                inferred_scope="long-term",
+                content="The Wi-Fi password is maple-4821 for the apartment router.",
+                kind="fact",
+                event_type="conversation_turn",
+                space_type="project-space",
+            )
+        finally:
+            os.environ.pop("MEMORY_RUNTIME_SENSITIVE_MEMORY_POLICY", None)
+            get_settings.cache_clear()
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertEqual(decision.reason, "sensitive_marked")
+        self.assertEqual(decision.effective_scope, "long-term")
+        self.assertTrue(decision.signals["sensitive"])
+        self.assertEqual(decision.signals["sensitivity_reason"], "privacy_sensitive_secret")
 
     def test_evaluate_promotion_decision_demotes_acknowledgement_like_agent_output(self) -> None:
         from app.services.consolidation import ConsolidationService

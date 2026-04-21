@@ -754,6 +754,14 @@ Definition of Done:
 - merge key canonicalization схлопывает близкие phrasing variants
 - явные противоречащие facts теперь `supersede` предыдущую active memory в том же пространстве
 - добавлены regression tests на semantic merge и contradiction supersede
+- promotion decision layer теперь учитывает `novelty_state`, `specificity_score`, `durability_score` и отдельный rescue loop
+- rescue loop теперь умеет:
+  - поднимать повторяющиеся `session_only` candidates в durable memory
+  - использовать positive feedback как rescue trigger
+  - блокировать rescue при net-negative feedback history
+- sensitive-memory policy теперь configurable:
+  - `reject` остается безопасным default
+  - `mark` позволяет сохранить sensitive memory как помеченную и по умолчанию маскировать ее в recall/adapters для личных use cases
 
 ### Phase M. Operational Polish
 
