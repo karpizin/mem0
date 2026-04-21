@@ -400,3 +400,78 @@ The concurrent recall story now looks much healthier:
 - throughput improved into a much more usable range while keeping the recall output compact and stable
 
 This does not mean the performance track is done, but it does move the runtime from “concurrent recall is the obvious weak spot” to “concurrent recall is now strong enough that deeper tuning can be more selective and production-oriented.”
+
+## Audit Payload Compaction And Split Audit Phases
+
+The next optimization pass focused on the tail of recall execution:
+
+- `recall_executed` audit payloads were made more compact
+- the stored trace now keeps:
+  - `candidate_count`
+  - `selected_count`
+  - `selected_space_types`
+  - `selected_episode_ids`
+  - a compact `selection_explanations` list with only:
+    - `episode_id`
+    - `space_type`
+    - `slot`
+    - `decisive_signal`
+    - `masked`
+    - sensitivity flags when relevant
+- verbose fields such as `display_text` and `why` are no longer duplicated into `audit_log`
+- recall phase telemetry now splits the audit tail into:
+  - `audit_payload_build`
+  - `audit_record`
+  - `audit_commit`
+
+This keeps the live API response unchanged while reducing the amount of JSON written synchronously into `audit_log`.
+
+### Before / After
+
+These numbers compare the query-aware capped-fetch baseline against the compact-audit variant.
+
+| Memories | Metric | Before | After | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `500` | `avg latency` | `229.225ms` | `214.825ms` | `-14.4ms` |
+| `500` | `p95 latency` | `275ms` | `243ms` | `-32ms` |
+| `500` | `throughput` | `31.6507 rps` | `33.179 rps` | `+1.5283 rps` |
+| `1000` | `avg latency` | `296.225ms` | `297.975ms` | `+1.75ms` |
+| `1000` | `p95 latency` | `320ms` | `325ms` | `+5ms` |
+| `1000` | `throughput` | `25.1936 rps` | `24.8669 rps` | `-0.3267 rps` |
+
+### Updated Phase Breakdown
+
+| Memories | Avg latency | `candidate_fetch` | `candidate_build` | `feedback_lookup` | `ranking` | `selection` | `audit_record` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `214.825ms` | `56.775ms` | `20.275ms` | `45.1ms` | `6.5ms` | `22.7ms` | `25.325ms` | `7.775ms` |
+| `1000` | `297.975ms` | `133.975ms` | `22.775ms` | `50.125ms` | `5.375ms` | `13.25ms` | `30.9ms` | `8.625ms` |
+
+### Updated Share Of Internal Recall Work
+
+| Memories | `candidate_fetch` | `feedback_lookup` | `audit_record` | `candidate_build` | `selection` | `audit_commit` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `500` | `30.78%` | `24.45%` | `13.73%` | `10.99%` | `12.31%` | `4.22%` |
+| `1000` | `50.55%` | `18.91%` | `11.66%` | `8.59%` | `5.0%` | `3.25%` |
+
+### Interpretation
+
+- this was a `partial win`, not another dramatic step-change
+- at `500` memories the compact audit payload improved both latency and throughput
+- at `1000` memories the result was effectively neutral and within normal benchmark noise
+- the important structural gain is that audit work is now easier to reason about:
+  - `audit_payload_build` is effectively negligible at current scale
+  - `audit_record` is visible but not dominant
+  - the largest remaining slices are still `candidate_fetch` and `feedback_lookup`
+- this strongly suggests that audit payload size was worth trimming for hygiene and operator usability, but it is not the main remaining scalability frontier
+
+### Updated Production-Oriented Takeaway
+
+After this step:
+
+- `latest recall brief` stays available for MCP and debugging
+- `audit_log` no longer stores a second copy of the most verbose explainability text
+- concurrent recall remains healthy at `500` and `1000` memories
+- the next performance targets should stay focused on:
+  - `candidate_fetch`
+  - `feedback_lookup`
+  - deeper DB/session contention under concurrency

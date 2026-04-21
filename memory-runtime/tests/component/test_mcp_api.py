@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+import json
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -220,6 +221,11 @@ class MCPApiTests(unittest.TestCase):
         brief_data = brief_response.json()["result"]["contents"][0]["text"]
         self.assertIn("What should the planner remember?", brief_data)
         self.assertIn("selection_explanations", brief_data)
+        latest_recall = json.loads(brief_data)["last_recall"]
+        explanation = latest_recall["trace"]["selection_explanations"][0]
+        self.assertIn("decisive_signal", explanation)
+        self.assertNotIn("display_text", explanation)
+        self.assertNotIn("why", explanation)
 
         prompts_response = self._post_mcp(_jsonrpc("prompts/list", req_id=6))
         prompt_names = {prompt["name"] for prompt in prompts_response.json()["result"]["prompts"]}

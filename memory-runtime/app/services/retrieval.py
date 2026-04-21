@@ -200,21 +200,19 @@ class RetrievalService:
                 selection_explanations=selection_explanations,
             ),
         )
+        phase_started_at = monotonic_timer()
+        audit_payload = self._recall_audit_payload(payload=payload, response=response)
+        phase_latencies_ms["audit_payload_build"] = elapsed_milliseconds(phase_started_at)
+        phase_started_at = monotonic_timer()
         self.audit.create(
             namespace_id=payload.namespace_id,
             agent_id=payload.agent_id,
             entity_type="agent" if payload.agent_id else "namespace",
             entity_id=payload.agent_id or payload.namespace_id,
             action="recall_executed",
-            details_json={
-                "query": payload.query,
-                "session_id": payload.session_id,
-                "context_budget_tokens": payload.context_budget_tokens,
-                "space_filter": payload.space_filter,
-                "brief": response.brief.model_dump(),
-                "trace": response.trace.model_dump(),
-            },
+            details_json=audit_payload,
         )
+        phase_latencies_ms["audit_record"] = elapsed_milliseconds(phase_started_at)
         phase_started_at = monotonic_timer()
         self.session.commit()
         phase_latencies_ms["audit_commit"] = elapsed_milliseconds(phase_started_at)
@@ -455,6 +453,50 @@ class RetrievalService:
                 )
             )
         return explanations
+
+    @classmethod
+    def _recall_audit_payload(
+        cls,
+        *,
+        payload: RecallRequest,
+        response: RecallResponse,
+    ) -> dict[str, object]:
+        return {
+            "query": payload.query,
+            "session_id": payload.session_id,
+            "context_budget_tokens": payload.context_budget_tokens,
+            "space_filter": payload.space_filter,
+            "brief": response.brief.model_dump(),
+            "trace": {
+                "candidate_count": response.trace.candidate_count,
+                "selected_count": response.trace.selected_count,
+                "selected_space_types": response.trace.selected_space_types,
+                "selected_episode_ids": response.trace.selected_episode_ids,
+                "selection_explanations": cls._compact_selection_explanations(
+                    response.trace.selection_explanations
+                ),
+            },
+        }
+
+    @staticmethod
+    def _compact_selection_explanations(
+        explanations: list[RecallSelectionExplanation],
+    ) -> list[dict[str, object]]:
+        compact: list[dict[str, object]] = []
+        for explanation in explanations:
+            item: dict[str, object] = {
+                "episode_id": explanation.episode_id,
+                "space_type": explanation.space_type,
+                "slot": explanation.slot,
+                "decisive_signal": explanation.decisive_signal,
+                "masked": explanation.masked,
+            }
+            if explanation.sensitive:
+                item["sensitive"] = True
+            if explanation.sensitivity_reason:
+                item["sensitivity_reason"] = explanation.sensitivity_reason
+            compact.append(item)
+        return compact
 
     @staticmethod
     def _brief_item(candidate: RetrievalCandidate) -> str:

@@ -716,6 +716,8 @@ Definition of Done:
   - `feedback_lookup`
   - `ranking`
   - `selection`
+  - `audit_payload_build`
+  - `audit_record`
   - `audit_commit`
 - первые concurrent baselines уже зафиксированы в performance report:
   - `500 memories` / `8-way concurrency` -> `avg ~1074ms`, `p95 ~1272ms`, `0 failures`
@@ -747,6 +749,11 @@ Definition of Done:
   - на `500` memories `candidate_fetch` около `37.6%` внутреннего recall времени
   - на `1000` memories `candidate_fetch` около `57.9%`
   - это делает следующими вероятными optimization targets уже не общий row volume, а feedback lookup и deeper DB/session contention under concurrency
+- после audit payload compaction для `recall_executed` и split telemetry по `audit_payload_build / audit_record / audit_commit` картина стала точнее:
+  - на `500` memories concurrent baseline еще улучшился до `avg ~214.8ms`, `p95 ~243ms`, `~33.18 rps`
+  - на `1000` memories эффект оказался почти нейтральным: `avg ~298ms`, `p95 ~325ms`, `~24.87 rps`
+  - это показало, что размер audit payload стоило уменьшить, но главным bottleneck он уже не является
+  - следующими реальными performance targets остаются `candidate_fetch`, `feedback_lookup` и deeper DB/session contention
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 

@@ -226,6 +226,8 @@ class ObservabilityApiTests(unittest.TestCase):
         self.assertGreaterEqual(performance["avg_selected_count"], 1.0)
         self.assertIn("candidate_fetch", performance["phase_avg_latency_ms"])
         self.assertIn("ranking", performance["phase_avg_latency_ms"])
+        self.assertIn("audit_payload_build", performance["phase_latency_ms_total"])
+        self.assertIn("audit_record", performance["phase_latency_ms_total"])
         self.assertIn("audit_commit", performance["phase_latency_ms_total"])
         self.assertTrue(performance["phase_latency_buckets_ms"]["candidate_fetch"])
 
@@ -238,6 +240,7 @@ class ObservabilityApiTests(unittest.TestCase):
         self.assertIn("memory_runtime_recall_latency_ms_total", body)
         self.assertIn("memory_runtime_recall_phase_latency_ms_total{phase=\"candidate_fetch\"}", body)
         self.assertIn("memory_runtime_recall_phase_latency_bucket_total{phase=\"candidate_fetch\"", body)
+        self.assertIn("memory_runtime_recall_phase_latency_ms_total{phase=\"audit_record\"}", body)
 
     def test_observability_quality_stats_report_promotion_and_rescue_breakdowns(self) -> None:
         self.client.post(
