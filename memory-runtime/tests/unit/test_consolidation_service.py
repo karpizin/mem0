@@ -257,3 +257,46 @@ class ConsolidationServiceContractTests(unittest.TestCase):
 
         self.assertEqual(decision.decision, "promote")
         self.assertEqual(decision.signals["novelty_state"], "reinforcing_existing")
+
+    def test_evaluate_promotion_decision_rescues_repeated_weak_candidate(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="agent_output",
+            inferred_scope="long-term",
+            content="Please note this.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+            rescue_history={
+                "demoted_count": 1,
+                "positive_feedback_count": 0,
+                "negative_feedback_count": 0,
+            },
+        )
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertEqual(decision.reason, "rescue_loop_promoted")
+        self.assertEqual(decision.signals["rescue_applied"], True)
+        self.assertEqual(decision.signals["rescue_trigger"], "repeated_session_only_candidate")
+
+    def test_evaluate_promotion_decision_rescues_transient_candidate_with_positive_feedback(self) -> None:
+        from app.services.consolidation import ConsolidationService
+
+        decision = ConsolidationService.evaluate_promotion_decision(
+            event_origin="user_input",
+            inferred_scope="long-term",
+            content="Temporary scratch note: this timeout issue happens before every pilot demo.",
+            kind="fact",
+            event_type="conversation_turn",
+            space_type="project-space",
+            rescue_history={
+                "demoted_count": 1,
+                "positive_feedback_count": 1,
+                "negative_feedback_count": 0,
+            },
+        )
+
+        self.assertEqual(decision.decision, "promote")
+        self.assertEqual(decision.reason, "rescue_loop_promoted")
+        self.assertEqual(decision.signals["rescue_trigger"], "positive_feedback")

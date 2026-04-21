@@ -383,3 +383,43 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(len(audit_rows), 1)
         self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
         self.assertIn("insufficient_specificity_not_durable", str(audit_rows[0][1]))
+
+    def test_worker_rescues_repeated_weak_candidate_into_long_term(self) -> None:
+        payload = {
+            "namespace_id": self.namespace_id,
+            "agent_id": self.agent_id,
+            "session_id": "run_weak_repeat_1",
+            "source_system": "openclaw",
+            "event_type": "conversation_turn",
+            "space_hint": "project-space",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "Please note this.",
+                }
+            ],
+        }
+
+        self.client.post("/v1/events", json=payload)
+        first_processed = WorkerRunner.run_pending_jobs()
+        second_payload = dict(payload)
+        second_payload["session_id"] = "run_weak_repeat_2"
+        self.client.post("/v1/events", json=second_payload)
+        second_processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(first_processed, 1)
+        self.assertEqual(second_processed, 1)
+        with get_engine().connect() as connection:
+            memory_rows = connection.execute(
+                text("SELECT content, scope FROM memory_units ORDER BY created_at ASC")
+            ).fetchall()
+            audit_rows = connection.execute(
+                text("SELECT action, details_json FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
+
+        self.assertEqual(len(memory_rows), 1)
+        self.assertEqual(memory_rows[0][1], "long-term")
+        self.assertIn("Please note this.", memory_rows[0][0])
+        self.assertEqual(audit_rows[0][0], "memory_candidate_demoted_session_only")
+        self.assertIn("insufficient_specificity_not_durable", str(audit_rows[0][1]))
+        self.assertEqual(audit_rows[1][0], "memory_unit_created")

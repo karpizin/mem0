@@ -165,6 +165,23 @@ Add signals that allow useful `session_only` content to be promoted later, for e
 - positive recall usefulness feedback
 - merge pressure from multiple similar episodes
 
+Current implementation status:
+
+- first rescue-loop baseline is now implemented
+- rescue is intentionally conservative:
+  - repeated `insufficient_specificity_not_durable` candidates can now promote on a later recurrence
+  - `session_only` candidates with positive recall feedback can now promote later, including some transient candidates
+- rescue does **not** apply to:
+  - low-trust rejections
+  - provenance-blocked origins such as `recalled_memory` or `system_boot`
+  - low-value acknowledgement / status chatter by repetition alone
+- demotion audit entries now store `merge_key` and `kind`, so rescue can reason over prior `session_only` history
+
+This means the policy now has two balancing forces:
+
+- anti-junk heuristics push weak content into `session_only`
+- rescue-loop heuristics can later pull genuinely useful content back into durable memory
+
 ### Step 4: False-Negative Evaluation Layer
 
 Add dedicated tests for useful memories that must not be filtered out:

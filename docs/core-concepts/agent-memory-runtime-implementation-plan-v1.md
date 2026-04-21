@@ -1216,6 +1216,10 @@ Definition of Done:
 - low-value assistant/tool status notes such as timeout messages and acknowledgement-style turns now demote to `session_only`
 - weak new assistant/tool/operator facts now demote to `session_only` as `insufficient_specificity_not_durable`
   while reinforcing existing durable memories can still merge/promote
+- first rescue-loop baseline is now implemented:
+  - repeated `insufficient_specificity_not_durable` candidates can later promote
+  - `session_only` candidates with positive recall feedback can later promote
+  - low-value acknowledgement/status chatter still does not get rescued by repetition alone
 - dialogue-based eval now exists as a regression layer for this policy:
   - curated multi-turn fixtures
   - manual annotations for the first dialogues

@@ -147,7 +147,7 @@ class PromotionDecision:
     decision: str
     effective_scope: str
     reason: str | None
-    signals: dict[str, str | bool | int]
+    signals: dict[str, str | bool | int | float]
 
 
 class ConsolidationService:
@@ -197,6 +197,13 @@ class ConsolidationService:
                 content=content,
             )
 
+        rescue_history = self.audit.session_only_history(
+            namespace_id=episode.namespace_id,
+            merge_key=merge_key,
+            kind=kind,
+            space_type=space_type,
+        )
+
         promotion = self.evaluate_promotion_decision(
             event_origin=event_origin,
             inferred_scope=scope,
@@ -205,6 +212,7 @@ class ConsolidationService:
             event_type=event_type,
             space_type=space_type,
             novelty_state=self._novelty_state(existing=existing, contradictory=contradictory),
+            rescue_history=rescue_history,
         )
         log_event(
             logger,
@@ -233,6 +241,8 @@ class ConsolidationService:
                     "space_type": space_type,
                     "event_type": event_type,
                     "event_origin": event_origin,
+                    "kind": kind,
+                    "merge_key": merge_key,
                     "reason": promotion.reason,
                     "effective_scope": promotion.effective_scope,
                     "signals": promotion.signals,
@@ -435,7 +445,13 @@ class ConsolidationService:
         event_type: str,
         space_type: str,
         novelty_state: str = "new",
+        rescue_history: dict[str, int] | None = None,
     ) -> PromotionDecision:
+        rescue_history = rescue_history or {
+            "demoted_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+        }
         low_trust_reason = cls.detect_low_trust_reason(content) if inferred_scope == "long-term" else None
         transient_reason = (
             cls.detect_transient_reason(
@@ -493,6 +509,9 @@ class ConsolidationService:
             "low_value": low_value_reason is not None,
             "weak_candidate": weak_candidate_reason is not None,
             "origin_demoted": event_origin in SESSION_ONLY_ORIGINS,
+            "rescue_demoted_count": rescue_history["demoted_count"],
+            "rescue_positive_feedback_count": rescue_history["positive_feedback_count"],
+            "rescue_negative_feedback_count": rescue_history["negative_feedback_count"],
         }
 
         if low_trust_reason is not None:
@@ -517,6 +536,21 @@ class ConsolidationService:
                 decision="session_only",
                 effective_scope="short-term",
                 reason=origin_reason,
+                signals=signals,
+            )
+
+        rescue_trigger = cls.detect_rescue_trigger(
+            transient_reason=transient_reason,
+            weak_candidate_reason=weak_candidate_reason,
+            rescue_history=rescue_history,
+        )
+        if rescue_trigger is not None:
+            signals["rescue_applied"] = True
+            signals["rescue_trigger"] = rescue_trigger
+            return PromotionDecision(
+                decision="promote",
+                effective_scope=inferred_scope,
+                reason="rescue_loop_promoted",
                 signals=signals,
             )
 
@@ -550,6 +584,22 @@ class ConsolidationService:
             reason=None,
             signals=signals,
         )
+
+    @staticmethod
+    def detect_rescue_trigger(
+        *,
+        transient_reason: str | None,
+        weak_candidate_reason: str | None,
+        rescue_history: dict[str, int],
+    ) -> str | None:
+        positive_feedback_count = rescue_history.get("positive_feedback_count", 0)
+        demoted_count = rescue_history.get("demoted_count", 0)
+
+        if positive_feedback_count > 0 and (transient_reason is not None or weak_candidate_reason is not None):
+            return "positive_feedback"
+        if weak_candidate_reason is not None and demoted_count > 0:
+            return "repeated_session_only_candidate"
+        return None
 
     @classmethod
     def detect_transient_reason(

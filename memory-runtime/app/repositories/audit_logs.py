@@ -98,3 +98,42 @@ class AuditLogRepository:
         else:
             stmt = stmt.where(AuditLog.agent_id == agent_id)
         return self.session.execute(stmt).scalar_one_or_none()
+
+    def session_only_history(
+        self,
+        *,
+        namespace_id: str,
+        merge_key: str,
+        kind: str,
+        space_type: str,
+    ) -> dict[str, int]:
+        stmt = (
+            select(AuditLog)
+            .where(AuditLog.namespace_id == namespace_id)
+            .where(AuditLog.action == "memory_candidate_demoted_session_only")
+            .order_by(AuditLog.created_at.desc())
+        )
+        demotion_rows = self.session.execute(stmt).scalars().all()
+        matching_episode_ids: list[str] = []
+        for row in demotion_rows:
+            details = row.details_json or {}
+            if details.get("merge_key") != merge_key:
+                continue
+            if details.get("kind") != kind:
+                continue
+            if details.get("space_type") != space_type:
+                continue
+            matching_episode_ids.append(row.entity_id)
+
+        feedback_scores = self.feedback_score_by_entity(
+            namespace_id=namespace_id,
+            entity_type="episode",
+            entity_ids=matching_episode_ids,
+        )
+        positive_feedback_count = sum(1 for score in feedback_scores.values() if score > 0)
+        negative_feedback_count = sum(1 for score in feedback_scores.values() if score < 0)
+        return {
+            "demoted_count": len(matching_episode_ids),
+            "positive_feedback_count": positive_feedback_count,
+            "negative_feedback_count": negative_feedback_count,
+        }
