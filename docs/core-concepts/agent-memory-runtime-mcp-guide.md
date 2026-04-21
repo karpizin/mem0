@@ -612,12 +612,22 @@ Guardrails:
 - `memory_runtime_mcp_resource_reads_total`
 - `memory_runtime_mcp_prompt_requests_total`
 - `memory_runtime_mcp_errors_total`
+- `memory_runtime_mcp_request_by_method_total{method,status}`
+- `memory_runtime_mcp_tool_call_by_name_total{tool_name,status}`
+- `memory_runtime_mcp_resource_read_by_name_total{resource_name,status}`
+- `memory_runtime_mcp_prompt_request_by_name_total{prompt_name,status}`
+- `memory_runtime_mcp_request_by_client_total{client_name}`
+- `memory_runtime_mcp_request_latency_bucket_total{bucket_ms}`
+- `memory_runtime_mcp_tool_latency_bucket_total{bucket_ms}`
 
 Это полезно для:
 
 - проверки, что MCP-клиент реально ходит в runtime
 - оценки интенсивности tool/resource/prompt usage
 - диагностики protocol-level ошибок
+- разделения transport-level ошибок и tool-level ошибок
+- понимания, какие MCP methods/tools реально используются чаще всего
+- оценки, где именно MCP surface начинает тормозить
 
 ## 14. Рекомендуемый flow интеграции
 

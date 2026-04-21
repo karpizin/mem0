@@ -10,6 +10,17 @@ class JobStats(BaseModel):
     stalled_running_count: int = 0
 
 
+class MCPStats(BaseModel):
+    requests_by_method: dict[str, dict[str, int]] = Field(default_factory=dict)
+    tool_calls_by_name: dict[str, dict[str, int]] = Field(default_factory=dict)
+    resource_reads_by_name: dict[str, dict[str, int]] = Field(default_factory=dict)
+    prompt_requests_by_name: dict[str, dict[str, int]] = Field(default_factory=dict)
+    requests_by_client: dict[str, int] = Field(default_factory=dict)
+    request_latency_buckets_ms: dict[str, int] = Field(default_factory=dict)
+    tool_latency_buckets_ms: dict[str, int] = Field(default_factory=dict)
+
+
 class ObservabilityStats(BaseModel):
     metrics: dict[str, int] = Field(default_factory=dict)
     jobs: JobStats
+    mcp: MCPStats = Field(default_factory=MCPStats)

@@ -1155,6 +1155,7 @@ Definition of Done:
 - `MCP` surface уже покрыт component tests и входит в общий green suite
 - safe write MCP tools `memory.ingest_event` и `memory.record_feedback` реализованы под guardrails и маппятся только на существующие runtime paths
 - MCP edge-case tests покрывают shared-space namespace writes, private project-memory isolation и запрет session-scoped writes в `agent-core`
+- MCP observability включает per-method, per-tool, per-resource, per-prompt, per-client breakdown и latency buckets
 
 Следующий rollout:
 

@@ -78,9 +78,26 @@ class ObservabilityApiTests(unittest.TestCase):
                 "context_budget_tokens": 500,
             },
         )
+        self.client.post(
+            "/mcp/openclaw/http/alice",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "memory.recall",
+                    "arguments": {
+                        "namespace_id": self.namespace_id,
+                        "agent_id": self.agent_id,
+                        "query": "What do metrics need to expose?",
+                        "context_budget_tokens": 500,
+                    },
+                },
+            },
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+        )
         WorkerRunner.run_pending_jobs()
         WorkerRunner.run_pending_jobs()
-        reset_metrics()
 
         response = self.client.get("/metrics")
 
@@ -91,13 +108,20 @@ class ObservabilityApiTests(unittest.TestCase):
         )
         body = response.text
         self.assertIn("# HELP memory_runtime_recall_requests_total", body)
-        self.assertIn("memory_runtime_recall_requests_total 0", body)
+        self.assertIn("memory_runtime_recall_requests_total 2", body)
         self.assertIn("memory_runtime_jobs_processed_total 2", body)
         self.assertIn("memory_runtime_consolidation_created_total 1", body)
         self.assertIn("memory_runtime_lifecycle_decayed_total 1", body)
+        self.assertIn("memory_runtime_mcp_requests_total 1", body)
+        self.assertIn("memory_runtime_mcp_tool_calls_total 1", body)
         self.assertIn('memory_runtime_job_status{status="completed"} 2', body)
         self.assertIn('memory_runtime_job_status_by_type{job_type="memory_consolidation",status="completed"} 1', body)
         self.assertIn('memory_runtime_job_status_by_type{job_type="memory_decay",status="completed"} 1', body)
+        self.assertIn('memory_runtime_mcp_request_by_method_total{method="tools/call",status="success"} 1', body)
+        self.assertIn('memory_runtime_mcp_tool_call_by_name_total{tool_name="memory.recall",status="success"} 1', body)
+        self.assertIn('memory_runtime_mcp_request_by_client_total{client_name="openclaw"} 1', body)
+        self.assertIn('memory_runtime_mcp_request_latency_bucket_total{bucket_ms="', body)
+        self.assertIn('memory_runtime_mcp_tool_latency_bucket_total{bucket_ms="', body)
 
     def test_observability_stats_endpoint_returns_metrics_and_job_breakdown(self) -> None:
         self.client.post(
@@ -113,6 +137,19 @@ class ObservabilityApiTests(unittest.TestCase):
                 ],
             },
         )
+        self.client.post(
+            "/mcp/openclaw/http/alice",
+            json={
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "memory.nope",
+                    "arguments": {},
+                },
+            },
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+        )
 
         response = self.client.get("/v1/observability/stats")
 
@@ -120,11 +157,16 @@ class ObservabilityApiTests(unittest.TestCase):
         payload = response.json()
         self.assertIn("metrics", payload)
         self.assertIn("jobs", payload)
+        self.assertIn("mcp", payload)
         self.assertEqual(payload["metrics"]["recall_requests_total"], 0)
         self.assertEqual(payload["jobs"]["by_status"]["pending"], 1)
         self.assertEqual(payload["jobs"]["by_type"]["memory_consolidation"]["pending"], 1)
         self.assertIsNotNone(payload["jobs"]["oldest_pending_age_seconds"])
         self.assertEqual(payload["jobs"]["stalled_running_count"], 0)
+        self.assertEqual(payload["mcp"]["requests_by_method"]["tools/call"]["success"], 1)
+        self.assertEqual(payload["mcp"]["tool_calls_by_name"]["memory.nope"]["result_error"], 1)
+        self.assertEqual(payload["mcp"]["requests_by_client"]["openclaw"], 1)
+        self.assertTrue(payload["mcp"]["request_latency_buckets_ms"])
 
     def test_stats_endpoint_uses_shared_db_metrics_for_worker_activity(self) -> None:
         self.client.post(

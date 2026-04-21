@@ -22,6 +22,8 @@ from app.services.ingestion import IngestionService
 from app.services.observability import ObservabilityService
 from app.services.retrieval import RetrievalService
 from app.telemetry.metrics import increment_metric
+from app.telemetry.metrics import elapsed_milliseconds, monotonic_timer, record_mcp_prompt_request
+from app.telemetry.metrics import record_mcp_request, record_mcp_resource_read, record_mcp_tool_call
 
 JSONRPC_VERSION = "2.0"
 MCP_PROTOCOL_VERSION = "2025-03-26"
@@ -68,36 +70,94 @@ class MCPService:
         self.observability = ObservabilityService(session)
 
     def handle_request(self, *, payload: dict[str, Any], client_name: str, user_id: str) -> dict[str, Any]:
+        started_at = monotonic_timer()
+        method = payload.get("method")
+        method_name = method if isinstance(method, str) else "invalid"
+        request_status = "success"
         increment_metric("mcp_requests_total")
         request_id = payload.get("id")
-        method = payload.get("method")
         params = payload.get("params") or {}
 
         if payload.get("jsonrpc") != JSONRPC_VERSION:
-            return self._error(request_id, -32600, "Invalid JSON-RPC version.")
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, -32600, "Invalid JSON-RPC version."),
+            )
         if not isinstance(method, str):
-            return self._error(request_id, -32600, "Missing JSON-RPC method.")
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, -32600, "Missing JSON-RPC method."),
+            )
 
         try:
             result = self._dispatch(method=method, params=params, client_name=client_name, user_id=user_id)
         except MCPError as exc:
             increment_metric("mcp_errors_total")
-            return self._error(request_id, exc.code, exc.message)
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, exc.code, exc.message),
+            )
         except LookupError as exc:
             increment_metric("mcp_errors_total")
-            return self._error(request_id, -32004, str(exc))
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, -32004, str(exc)),
+            )
         except ValueError as exc:
             increment_metric("mcp_errors_total")
-            return self._error(request_id, -32602, str(exc))
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, -32602, str(exc)),
+            )
         except Exception as exc:  # pragma: no cover - defensive path
             increment_metric("mcp_errors_total")
-            return self._error(request_id, -32603, f"Internal MCP error: {exc}")
+            request_status = "error"
+            return self._finalize_request(
+                request_id=request_id,
+                client_name=client_name,
+                method_name=method_name,
+                request_status=request_status,
+                started_at=started_at,
+                payload=self._error(request_id, -32603, f"Internal MCP error: {exc}"),
+            )
 
-        return {
+        return self._finalize_request(
+            request_id=request_id,
+            client_name=client_name,
+            method_name=method_name,
+            request_status=request_status,
+            started_at=started_at,
+            payload={
             "jsonrpc": JSONRPC_VERSION,
             "id": request_id,
             "result": result,
-        }
+            },
+        )
 
     def _dispatch(self, *, method: str, params: dict[str, Any], client_name: str, user_id: str) -> dict[str, Any]:
         if method == "initialize":
@@ -136,35 +196,56 @@ class MCPService:
         }
 
     def _call_tool(self, params: dict[str, Any], *, client_name: str, user_id: str) -> dict[str, Any]:
+        started_at = monotonic_timer()
         tool_name = params.get("name")
         arguments = params.get("arguments") or {}
         if not isinstance(tool_name, str):
             raise MCPError(-32602, "tools/call requires a tool name.")
 
-        if tool_name == "memory.recall":
-            payload = RecallRequest(**arguments)
-            response = self.retrieval.recall(payload)
-            data = response.model_dump()
-        elif tool_name == "memory.search":
-            data = self._search(arguments)
-        elif tool_name == "memory.list_spaces":
-            data = self._list_spaces(arguments)
-        elif tool_name == "memory.get_observability_snapshot":
-            data = self.observability.stats().model_dump()
-        elif tool_name == "memory.get_memory_unit":
-            data = self._get_memory_unit(arguments)
-        elif tool_name == "memory.ingest_event":
-            increment_metric("mcp_write_tool_calls_total")
-            data = self._ingest_event(arguments, client_name=client_name, user_id=user_id)
-        elif tool_name == "memory.record_feedback":
-            increment_metric("mcp_write_tool_calls_total")
-            data = self._record_feedback(arguments, client_name=client_name, user_id=user_id)
-        else:
-            return {
-                "isError": True,
-                "content": [{"type": "text", "text": f"Unknown MCP tool '{tool_name}'."}],
-            }
+        try:
+            tool_status = "success"
+            if tool_name == "memory.recall":
+                payload = RecallRequest(**arguments)
+                response = self.retrieval.recall(payload)
+                data = response.model_dump()
+            elif tool_name == "memory.search":
+                data = self._search(arguments)
+            elif tool_name == "memory.list_spaces":
+                data = self._list_spaces(arguments)
+            elif tool_name == "memory.get_observability_snapshot":
+                data = self.observability.stats().model_dump()
+            elif tool_name == "memory.get_memory_unit":
+                data = self._get_memory_unit(arguments)
+            elif tool_name == "memory.ingest_event":
+                increment_metric("mcp_write_tool_calls_total")
+                data = self._ingest_event(arguments, client_name=client_name, user_id=user_id)
+            elif tool_name == "memory.record_feedback":
+                increment_metric("mcp_write_tool_calls_total")
+                data = self._record_feedback(arguments, client_name=client_name, user_id=user_id)
+            else:
+                tool_status = "result_error"
+                record_mcp_tool_call(
+                    tool_name=tool_name,
+                    status=tool_status,
+                    latency_ms=elapsed_milliseconds(started_at),
+                )
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": f"Unknown MCP tool '{tool_name}'."}],
+                }
+        except Exception:
+            record_mcp_tool_call(
+                tool_name=tool_name,
+                status="error",
+                latency_ms=elapsed_milliseconds(started_at),
+            )
+            raise
 
+        record_mcp_tool_call(
+            tool_name=tool_name,
+            status="success",
+            latency_ms=elapsed_milliseconds(started_at),
+        )
         return {
             "content": [{"type": "text", "text": self._json_text(data)}],
             "structuredContent": data,
@@ -381,7 +462,13 @@ class MCPService:
 
     def _read_resource(self, params: dict[str, Any]) -> dict[str, Any]:
         uri = self._require_str(params, "uri")
-        data = self._resource_payload(uri)
+        resource_name = self._resource_name_from_uri(uri)
+        try:
+            data = self._resource_payload(uri)
+        except Exception:
+            record_mcp_resource_read(resource_name=resource_name, status="error")
+            raise
+        record_mcp_resource_read(resource_name=resource_name, status="success")
         return {
             "contents": [
                 {
@@ -491,39 +578,44 @@ class MCPService:
     def _get_prompt(self, params: dict[str, Any]) -> dict[str, Any]:
         name = self._require_str(params, "name")
         arguments = params.get("arguments") or {}
-        if name == "debug-memory-miss":
-            namespace_id = self._require_str(arguments, "namespace_id")
-            agent_id = self._require_str(arguments, "agent_id")
-            expected_memory = self._require_str(arguments, "expected_memory")
-            query = arguments.get("query", "Why did the runtime miss the expected memory?")
-            text = (
-                f"Investigate a memory miss for namespace '{namespace_id}' and agent '{agent_id}'. "
-                f"Expected memory: {expected_memory}. "
-                f"Original query: {query}. "
-                "Inspect the latest recall trace, selected memories, and relevant memory units. "
-                "Explain whether the miss came from ingestion, consolidation, ranking, or brief packing."
-            )
-        elif name == "prepare-memory-aware-task":
-            namespace_id = self._require_str(arguments, "namespace_id")
-            task = self._require_str(arguments, "task")
-            agent_id = arguments.get("agent_id")
-            session_id = arguments.get("session_id")
-            text = (
-                f"Prepare to work on task '{task}' in namespace '{namespace_id}'. "
-                f"Agent id: {agent_id or 'n/a'}. Session id: {session_id or 'n/a'}. "
-                "First call memory.recall with a focused query, then summarize the resulting memory brief "
-                "before continuing with the task."
-            )
-        elif name == "inspect-namespace-health":
-            namespace_id = self._require_str(arguments, "namespace_id")
-            text = (
-                f"Inspect namespace '{namespace_id}' health. "
-                "Read the namespace summary and observability resources, then report on backlog, stalled jobs, "
-                "recent recall activity, and any signs of memory quality degradation."
-            )
-        else:
-            raise MCPError(-32602, f"Unknown prompt '{name}'")
+        try:
+            if name == "debug-memory-miss":
+                namespace_id = self._require_str(arguments, "namespace_id")
+                agent_id = self._require_str(arguments, "agent_id")
+                expected_memory = self._require_str(arguments, "expected_memory")
+                query = arguments.get("query", "Why did the runtime miss the expected memory?")
+                text = (
+                    f"Investigate a memory miss for namespace '{namespace_id}' and agent '{agent_id}'. "
+                    f"Expected memory: {expected_memory}. "
+                    f"Original query: {query}. "
+                    "Inspect the latest recall trace, selected memories, and relevant memory units. "
+                    "Explain whether the miss came from ingestion, consolidation, ranking, or brief packing."
+                )
+            elif name == "prepare-memory-aware-task":
+                namespace_id = self._require_str(arguments, "namespace_id")
+                task = self._require_str(arguments, "task")
+                agent_id = arguments.get("agent_id")
+                session_id = arguments.get("session_id")
+                text = (
+                    f"Prepare to work on task '{task}' in namespace '{namespace_id}'. "
+                    f"Agent id: {agent_id or 'n/a'}. Session id: {session_id or 'n/a'}. "
+                    "First call memory.recall with a focused query, then summarize the resulting memory brief "
+                    "before continuing with the task."
+                )
+            elif name == "inspect-namespace-health":
+                namespace_id = self._require_str(arguments, "namespace_id")
+                text = (
+                    f"Inspect namespace '{namespace_id}' health. "
+                    "Read the namespace summary and observability resources, then report on backlog, stalled jobs, "
+                    "recent recall activity, and any signs of memory quality degradation."
+                )
+            else:
+                raise MCPError(-32602, f"Unknown prompt '{name}'")
+        except Exception:
+            record_mcp_prompt_request(prompt_name=name, status="error")
+            raise
 
+        record_mcp_prompt_request(prompt_name=name, status="success")
         return {
             "description": next(prompt.description for prompt in self._prompts() if prompt.name == name),
             "messages": [
@@ -572,6 +664,39 @@ class MCPService:
                 "message": message,
             },
         }
+
+    @staticmethod
+    def _resource_name_from_uri(uri: str) -> str:
+        parsed = urlparse(uri)
+        parts = [part for part in parsed.path.split("/") if part]
+        if parsed.netloc == "namespaces" and len(parts) >= 2:
+            if parts[1] == "summary":
+                return "namespace-summary"
+            if parts[1] == "observability":
+                return "namespace-observability"
+            if parts[1] == "agents" and len(parts) >= 4 and parts[3] == "brief":
+                return "latest-agent-brief"
+            if parts[1] == "agents" and len(parts) >= 4 and parts[3] == "spaces":
+                return "agent-spaces"
+        return "unknown"
+
+    @staticmethod
+    def _finalize_request(
+        *,
+        request_id: Any,
+        client_name: str,
+        method_name: str,
+        request_status: str,
+        started_at: float,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        record_mcp_request(
+            method=method_name,
+            status=request_status,
+            client_name=client_name,
+            latency_ms=elapsed_milliseconds(started_at),
+        )
+        return payload
 
     @staticmethod
     def _require_str(payload: dict[str, Any], key: str) -> str:

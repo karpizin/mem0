@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.jobs import JobRepository
-from app.schemas.observability import JobStats, ObservabilityStats
-from app.telemetry.metrics import render_prometheus_metrics, snapshot_metrics
+from app.schemas.observability import JobStats, MCPStats, ObservabilityStats
+from app.telemetry.metrics import render_prometheus_metrics, snapshot_mcp_metrics, snapshot_metrics
 
 
 class ObservabilityService:
@@ -21,6 +21,7 @@ class ObservabilityService:
             counters=self._metrics_snapshot(),
             job_status_counts=self._job_status_counts(),
             job_type_status_counts=self.jobs.count_by_type_and_status(),
+            mcp_metrics=snapshot_mcp_metrics(),
         )
 
     def stats(self) -> ObservabilityStats:
@@ -41,6 +42,7 @@ class ObservabilityService:
                     stale_after_seconds=self.settings.stalled_job_after_seconds
                 ),
             ),
+            mcp=MCPStats(**snapshot_mcp_metrics()),
         )
 
     def _job_status_counts(self) -> dict[str, int]:
