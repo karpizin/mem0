@@ -297,11 +297,17 @@ Promotion decision layer теперь включает и первый `rescue l
 - при этом acknowledgement/status chatter и blocked origins не получают такого апгрейда “по инерции”
 `make lifecycle-eval` прогоняет lifecycle scenarios для `decay/archive/evict/no-op` и печатает отдельный quality report по memory lifecycle.
 `make continuity-benchmark` прогоняет cross-session continuity scenarios и проверяет, что durable architecture facts, standing procedures и integration context действительно переживают consolidation и возвращаются в recall.
-`make performance-benchmark ARGS="--memory-count 200 --query-count 5"` поднимает плотный synthetic memory pool, выполняет серию recall probes и возвращает JSON-отчет с:
+`make performance-benchmark ARGS="--scenario all --memory-count 200 --query-count 5"` прогоняет performance/scalability benchmark pool и возвращает JSON-отчет с:
 - `latency_ms` (`min / avg / p50 / p95 / max`)
 - `candidate_count`
 - `selected_count`
 - `brief_chars`
+Сейчас pool включает несколько профилей:
+- `balanced_runtime`
+- `procedure_heavy`
+- `session_pressure`
+- `integration_mix`
+При желании можно прогонять и любой отдельный профиль через `--scenario <name>`.
 Дополнительно retrieval и injection теперь имеют explicit high-density regressions:
 - unit-тест на `~40` candidate memories проверяет, что brief остается релевантным и не засоряется шумом
 - legacy recall test на `120` memories проверяет, что OpenClaw все равно подмешивает только компактный top-slice в рамках budget

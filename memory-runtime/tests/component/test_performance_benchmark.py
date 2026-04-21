@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import Base, get_engine, reset_database_caches
 from app.main import create_app
-from app.performance_benchmark import run_performance_benchmark
+from app.performance_benchmark import run_performance_benchmark, run_performance_benchmark_pool
 from app.telemetry.metrics import reset_metrics
 from app.workers.runner import WorkerRunner
 
@@ -56,3 +56,22 @@ class PerformanceBenchmarkTests(unittest.TestCase):
         self.assertGreaterEqual(report["metrics"]["selected_count"]["avg"], 1.0)
         self.assertGreaterEqual(report["metrics"]["brief_chars"]["avg"], 1.0)
         self.assertGreaterEqual(report["metrics"]["latency_ms"]["max"], report["metrics"]["latency_ms"]["min"])
+
+    def test_run_performance_benchmark_pool_returns_multi_scenario_summary(self) -> None:
+        report = run_performance_benchmark_pool(
+            self.client,
+            namespace_suffix="component-perf-pool",
+            memory_count=20,
+            query_count=2,
+            scenarios=["balanced_runtime", "procedure_heavy", "session_pressure"],
+            job_drainer=WorkerRunner.run_pending_jobs,
+            poll_seconds=0.01,
+            max_wait_seconds=5.0,
+        )
+
+        self.assertEqual(report["scenario_count"], 3)
+        self.assertEqual(report["memory_count_per_scenario"], 20)
+        self.assertEqual(report["query_count_per_scenario"], 2)
+        self.assertEqual(len(report["scenarios"]), 3)
+        self.assertGreaterEqual(report["overall"]["candidate_count"]["avg"], 20.0)
+        self.assertGreaterEqual(report["overall"]["selected_count"]["avg"], 1.0)

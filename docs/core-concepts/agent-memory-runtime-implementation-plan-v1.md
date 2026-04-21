@@ -702,7 +702,12 @@ Definition of Done:
 - retrieval/openclaw regressions теперь отдельно покрывают high-density cases на `~40` и `120` memories, чтобы проверять selection, anti-noise и compact injection под budget
 - e2e adapter recall теперь тоже покрывает high-density memory pools, проверяя итоговый `brief` и `trace` на `41` и `120` memories
 - observability теперь дает отдельный `performance` block по recall latency/candidate pressure
-- есть отдельный `make performance-benchmark`, который строит плотный memory pool и возвращает latency/candidate/brief-size baseline
+- есть отдельный `make performance-benchmark`, который прогоняет multi-scenario performance pool:
+  - `balanced_runtime`
+  - `procedure_heavy`
+  - `session_pressure`
+  - `integration_mix`
+  и возвращает latency/candidate/brief-size baseline по каждому профилю и overall summary
 - retrieval selection отсеивает low-signal noise в `MemoryBrief`
 - для живого пилота есть отдельный сценарный пакет с acceptance expectations
 
