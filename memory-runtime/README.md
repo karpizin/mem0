@@ -253,11 +253,12 @@ Live runner теперь имеет отдельный process-timeout guard и 
 Harness теперь поддерживает и scripted сценарии:
 - последовательности `ingest -> feedback -> ingest` для проверки rescue-loop поведения
 - ожидания по `audit.actions`, `audit.reasons` и `audit.signal_values`, чтобы различать `blocked rescue` и обычный demotion
-Текущий curated corpus включает `12` вручную размеченных semi-real сценариев:
+Текущий curated corpus включает `15` вручную размеченных semi-real сценариев:
 - architecture / standing procedures / timeout issues
 - household and logistics chats в стиле Telegram/WhatsApp
 - noisy preference, delivery, travel, maintenance и family-ops threads
 - scripted rescue-flow cases с `negative` и `net-positive` feedback
+- `must-reject` и `privacy-sensitive` cases, где memory poisoning, Wi-Fi/API credentials и другой obvious secret material должны остаться вне durable memory и recall
 Это дает нам более честный baseline не только на коротких synthetic turns, но и на шумной бытовой переписке, где важно отделять durable signal от однодневного chatter.
 Promotion decision layer теперь включает и первый `rescue loop`:
 - повторяющиеся `session_only` кандидаты с причиной `insufficient_specificity_not_durable` могут позже продвинуться в durable memory

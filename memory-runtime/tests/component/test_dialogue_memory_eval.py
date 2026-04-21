@@ -52,9 +52,9 @@ class DialogueMemoryEvalTests(unittest.TestCase):
             job_drainer=WorkerRunner.run_pending_jobs,
         )
 
-        self.assertEqual(report["total"], 12)
+        self.assertEqual(report["total"], 15)
         self.assertEqual(report["failed"], 0)
-        self.assertEqual(report["passed"], 12)
+        self.assertEqual(report["passed"], 15)
         self.assertEqual(report["metrics"]["storage_pass_rate"], 1.0)
         self.assertEqual(report["metrics"]["audit_pass_rate"], 1.0)
         self.assertEqual(report["metrics"]["recall_pass_rate"], 1.0)

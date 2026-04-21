@@ -274,6 +274,37 @@ class ConsolidationPipelineTests(unittest.TestCase):
         self.assertEqual(memory_units_count, 0)
         self.assertEqual(job_status, "completed")
 
+    def test_worker_rejects_privacy_sensitive_secret_candidate(self) -> None:
+        payload = {
+            "namespace_id": self.namespace_id,
+            "agent_id": self.agent_id,
+            "session_id": "run_privacy_1",
+            "source_system": "openclaw",
+            "event_type": "conversation_turn",
+            "space_hint": "project-space",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "The Wi-Fi password is maple-4821 for the apartment router.",
+                }
+            ],
+        }
+        self.client.post("/v1/events", json=payload)
+
+        processed = WorkerRunner.run_pending_jobs()
+
+        self.assertEqual(processed, 1)
+        with get_engine().connect() as connection:
+            memory_units_count = connection.execute(text("SELECT COUNT(*) FROM memory_units")).scalar_one()
+            audit_rows = connection.execute(
+                text("SELECT action, details_json FROM audit_log ORDER BY created_at ASC")
+            ).fetchall()
+
+        self.assertEqual(memory_units_count, 0)
+        self.assertEqual(len(audit_rows), 1)
+        self.assertEqual(audit_rows[0][0], "memory_candidate_rejected_low_trust")
+        self.assertIn("privacy_sensitive_secret", str(audit_rows[0][1]))
+
     def test_worker_demotes_recalled_memory_candidate_to_session_only(self) -> None:
         payload = {
             "namespace_id": self.namespace_id,
