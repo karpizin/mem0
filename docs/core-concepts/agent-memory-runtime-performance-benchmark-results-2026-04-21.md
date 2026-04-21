@@ -284,6 +284,80 @@ That makes the next performance/scalability frontier much clearer:
 - keep using `in-process` for rapid optimization loops
 - use `real HTTP + Postgres` to track backlog pressure and end-to-end operational cost
 
+## Ingestion / Backlog Benchmark Baseline
+
+To measure the operational contour directly, a dedicated `ingestion-benchmark` was added.
+
+This benchmark does not focus on recall quality. It measures:
+
+- event ingestion throughput
+- peak pending job backlog
+- queue state immediately after burst ingestion
+- how much of the backlog is actually drained within a bounded wait window
+
+The first baseline was taken in `in_process` mode on clean temporary SQLite databases so the numbers are reproducible and easy to compare run-to-run.
+
+Configuration:
+
+- `balanced_runtime`
+- sample pending-job snapshots every `100` events for the `1000` run
+- sample pending-job snapshots every `250` events for the `3000` run
+- default bounded drain window from the benchmark harness
+
+### Results
+
+| Events | Ingest throughput | Avg ingest latency | P95 ingest latency | Peak pending jobs | Pending after ingest | Drain result | Drain seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| `1000` | `169.5248 eps` | `5.364ms` | `7ms` | `1000` | `1000` | `drained` | `18.6065s` |
+| `3000` | `174.1748 eps` | `5.2323ms` | `7ms` | `3000` | `3000` | `not fully drained` | `109.2387s` |
+
+### Detailed Queue Outcome
+
+`1000` events:
+
+- after ingest:
+  - `1000` pending `memory_consolidation` jobs
+- after drain:
+  - `1000` completed `memory_consolidation`
+  - `1000` completed `memory_decay`
+  - `0` pending jobs
+
+`3000` events:
+
+- after ingest:
+  - `3000` pending `memory_consolidation` jobs
+- after the bounded drain attempt:
+  - `3000` completed `memory_consolidation`
+  - `3000` pending `memory_decay`
+  - `0` failed jobs
+  - queue was still not fully drained
+
+### Interpretation
+
+- raw event ingestion itself is not the bottleneck right now
+  - both runs sustained roughly `170 events/sec`
+  - per-event ingest latency stayed around `5ms`
+- the real scaling pressure is in `post-ingest backlog drain`
+- `1000` events still looks healthy:
+  - the system clears both consolidation and lifecycle follow-up within about `18.6s`
+- `3000` events is the first strong sign of operational saturation in the in-process contour:
+  - the system clears the initial consolidation wave
+  - but lifecycle work remains queued after more than `100s`
+
+### Production-Oriented Takeaway
+
+This is currently the clearest operational risk signal in the whole performance track:
+
+- recall itself is in a good place
+- burst ingestion is acceptable
+- but large backlogs fan out into a second wave of lifecycle work that can outlive the first drain window
+
+That means the next production-oriented performance work should focus on:
+
+- lifecycle fan-out pressure
+- worker throughput under chained job generation
+- backlog drain time as a first-class SLO metric, not only recall latency
+
 ## Soak Benchmark
 
 To measure repeated-recall stability on large memory pools, an additional soak benchmark was run on the `balanced_runtime` scenario.

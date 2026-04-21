@@ -1,4 +1,4 @@
-.PHONY: install-dev run run-worker run-worker-once test test-unittest lint format smoke test-e2e preflight pilot-smoke mcp-smoke pilot-scenarios pilot-negative-scenarios openclaw-live-pilot pilot-scorecard quality-eval dialogue-eval lifecycle-eval continuity-benchmark performance-benchmark soak-benchmark load-benchmark scale-benchmark compare-eval reset-pilot snapshot-pilot restore-pilot show-pilot-snapshots inspect-memories inspect-memory-lifecycle explain-recall show-last-smoke show-last-quality-eval
+.PHONY: install-dev run run-worker run-worker-once test test-unittest lint format smoke test-e2e preflight pilot-smoke mcp-smoke pilot-scenarios pilot-negative-scenarios openclaw-live-pilot pilot-scorecard quality-eval dialogue-eval lifecycle-eval continuity-benchmark performance-benchmark soak-benchmark load-benchmark scale-benchmark ingestion-benchmark compare-eval reset-pilot snapshot-pilot restore-pilot show-pilot-snapshots inspect-memories inspect-memory-lifecycle explain-recall show-last-smoke show-last-quality-eval
 
 PYTHON ?= $(shell bash scripts/resolve_python.sh)
 PORT ?= 8080
@@ -65,6 +65,9 @@ load-benchmark:
 
 scale-benchmark:
 	$(PYTHON) -m app.scale_benchmark $(ARGS)
+
+ingestion-benchmark:
+	$(PYTHON) -m app.ingestion_benchmark $(ARGS)
 
 compare-eval:
 	bash scripts/compare_eval_reports.sh "$(BEFORE)" "$(AFTER)"

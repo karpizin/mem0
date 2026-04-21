@@ -247,6 +247,7 @@
 - sequential `soak-benchmark`
 - concurrent `load-benchmark`
 - multi-size `scale-benchmark`
+- operational `ingestion-benchmark`
 - phase profiling для `candidate_fetch`, `candidate_build`, `feedback_lookup`, `ranking`, `selection`, `audit_*`
 
 Практический статус на сегодня:
@@ -257,6 +258,7 @@
 - отдельно зафиксирована методологическая проверка `in-process` vs `real local HTTP runtime`, чтобы не путать алгоритмическую скорость памяти со скоростью полного сервисного контура
 - live verification также показала важный operational нюанс: для тяжелых `3000`-memory ingestion/load прогонов `SQLite` уже перестает быть хорошим production proxy из-за `database is locked`; следующий реалистичный benchmark layer должен идти через `Postgres`
 - после перехода на `real local HTTP + Postgres` оказалось, что сам recall-path там уже быстрее и правдоподобнее, чем `in-process + SQLite`, а главным realism-сигналом становится не recall latency, а величина фонового backlog после массовой подготовки benchmark-пула
+- новый `ingestion-benchmark` подтвердил это еще сильнее: при `3000` events bottleneck находится уже не в ingest latency, а в `consolidation -> lifecycle` backlog drain
 
 ### Статус `Phase H`
 
