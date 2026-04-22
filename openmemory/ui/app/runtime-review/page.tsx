@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, Pencil, RefreshCcw, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Eye,
+  Loader2,
+  Pencil,
+  RefreshCcw,
+  RotateCcw,
+  ShieldAlert,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +43,16 @@ function deriveScope(memory: RuntimeReviewMemory): "private" | "group" {
   return memory.space_type === "shared-space" ? "group" : "private";
 }
 
+function getScopeDescription(scope: ScopeFilter): string {
+  if (scope === "private") {
+    return "Agent-specific and personal memory items.";
+  }
+  if (scope === "group") {
+    return "Project memory shared across cooperating agents.";
+  }
+  return "Both private and group memories visible to the current review context.";
+}
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "n/a";
@@ -49,6 +70,12 @@ function isSensitive(memory: RuntimeReviewMemory): boolean {
 
 function isMasked(memory: RuntimeReviewMemory): boolean {
   return Boolean(memory.metadata?.masked);
+}
+
+function getMetadataEntries(memory: RuntimeReviewMemory): Array<[string, string]> {
+  return Object.entries(memory.metadata || {})
+    .filter(([, value]) => value !== null && value !== "")
+    .map(([key, value]) => [key, String(value)]);
 }
 
 function RuntimeReviewPage() {
@@ -74,6 +101,7 @@ function RuntimeReviewPage() {
   const [editText, setEditText] = useState("");
   const [editReason, setEditReason] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -126,6 +154,24 @@ function RuntimeReviewPage() {
     [memories, selectedMemoryId]
   );
 
+  const scopeStats = useMemo(() => {
+    const privateCount = memories.filter((memory) => deriveScope(memory) === "private").length;
+    const groupCount = memories.filter((memory) => deriveScope(memory) === "group").length;
+    const sensitiveCount = memories.filter((memory) => isSensitive(memory)).length;
+    return {
+      total: memories.length,
+      privateCount,
+      groupCount,
+      sensitiveCount,
+    };
+  }, [memories]);
+
+  const isDirty = selectedMemory !== null && editText !== selectedMemory.memory;
+  const selectedMetadata = useMemo(
+    () => (selectedMemory ? getMetadataEntries(selectedMemory) : []),
+    [selectedMemory]
+  );
+
   const filteredMemories = useMemo(() => {
     const query = searchText.trim().toLowerCase();
     return memories.filter((memory) => {
@@ -154,6 +200,32 @@ function RuntimeReviewPage() {
     setEditText(selectedMemory.memory);
     setEditReason("");
   }, [selectedMemory]);
+
+  async function handleCopy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedValue(label);
+      toast.success(`${label} copied`);
+      window.setTimeout(() => {
+        setCopiedValue((current) => (current === label ? null : current));
+      }, 1500);
+    } catch {
+      toast.error(`Failed to copy ${label.toLowerCase()}`);
+    }
+  }
+
+  function handleResetContext() {
+    setNamespaceId("");
+    setAgentId("");
+    setSessionId("");
+    setSearchText("");
+    setMemories([]);
+    setSelectedMemoryId(null);
+    setEditReason("");
+    setEditText("");
+    setIsEditing(false);
+    toast.success("Runtime review context cleared");
+  }
 
   async function handleLoadMemories() {
     if (!namespaceId.trim()) {
@@ -309,6 +381,15 @@ function RuntimeReviewPage() {
                 {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />}
                 Load Review Surface
               </Button>
+              <Button
+                variant="outline"
+                className="border-zinc-700 bg-zinc-950"
+                onClick={handleResetContext}
+                disabled={isLoading}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Clear Context
+              </Button>
               <Badge variant="outline" className="border-zinc-700 text-zinc-300">
                 {sessionId.trim() ? "Session review mode" : "Long-term review mode"}
               </Badge>
@@ -320,6 +401,28 @@ function RuntimeReviewPage() {
                   {error}
                 </Badge>
               ) : null}
+            </div>
+            <div className="md:col-span-2 xl:col-span-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Loaded</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{scopeStats.total}</p>
+                <p className="mt-1 text-xs text-zinc-400">Visible review items in current context</p>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Private</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{scopeStats.privateCount}</p>
+                <p className="mt-1 text-xs text-zinc-400">Agent-specific memory items</p>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Group</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{scopeStats.groupCount}</p>
+                <p className="mt-1 text-xs text-zinc-400">Project-shared memory items</p>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Sensitive</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{scopeStats.sensitiveCount}</p>
+                <p className="mt-1 text-xs text-zinc-400">Require masking-aware review</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -365,6 +468,12 @@ function RuntimeReviewPage() {
                     </Button>
                   ))}
                 </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
+                  <span className="font-medium text-zinc-200">
+                    {scopeFilter === "all" ? "All scopes" : scopeFilter === "private" ? "Private scope" : "Group scope"}
+                  </span>
+                  {` - ${getScopeDescription(scopeFilter)}`}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -393,6 +502,9 @@ function RuntimeReviewPage() {
                             <div className="space-y-2">
                               <p className="text-sm font-medium text-white line-clamp-3">
                                 {memory.memory}
+                              </p>
+                              <p className="text-xs text-zinc-500">
+                                Updated {formatDate(memory.updated_at || memory.created_at)}
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 <Badge variant="outline" className="border-zinc-700 text-zinc-300">
@@ -440,27 +552,49 @@ function RuntimeReviewPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="border-zinc-700 text-zinc-300">
-                      {deriveScope(selectedMemory)}
-                    </Badge>
-                    <Badge variant="outline" className="border-zinc-700 text-zinc-300">
-                      {selectedMemory.resource_kind}
-                    </Badge>
-                    <Badge variant="outline" className="border-zinc-700 text-zinc-300">
-                      {selectedMemory.space_type}
-                    </Badge>
-                    {isSensitive(selectedMemory) ? (
-                      <Badge variant="destructive" className="gap-1">
-                        <ShieldAlert className="w-3 h-3" />
-                        Sensitive
-                      </Badge>
-                    ) : null}
-                    {isMasked(selectedMemory) ? (
-                      <Badge variant="outline" className="border-amber-700 text-amber-300">
-                        Masked by policy
-                      </Badge>
-                    ) : null}
+                  <div className="flex flex-col gap-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="border-zinc-700 text-zinc-300">
+                          {deriveScope(selectedMemory)}
+                        </Badge>
+                        <Badge variant="outline" className="border-zinc-700 text-zinc-300">
+                          {selectedMemory.resource_kind}
+                        </Badge>
+                        <Badge variant="outline" className="border-zinc-700 text-zinc-300">
+                          {selectedMemory.space_type}
+                        </Badge>
+                        {isSensitive(selectedMemory) ? (
+                          <Badge variant="destructive" className="gap-1">
+                            <ShieldAlert className="w-3 h-3" />
+                            Sensitive
+                          </Badge>
+                        ) : null}
+                        {isMasked(selectedMemory) ? (
+                          <Badge variant="outline" className="border-amber-700 text-amber-300">
+                            Masked by policy
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-zinc-700 bg-zinc-900"
+                        onClick={() => handleCopy(selectedMemory.id, "Memory ID")}
+                      >
+                        {copiedValue === "Memory ID" ? (
+                          <Check className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Copy className="w-4 h-4 mr-2" />
+                        )}
+                        Copy ID
+                      </Button>
+                    </div>
+                    <p className="text-sm text-zinc-300">
+                      {deriveScope(selectedMemory) === "group"
+                        ? "This item is visible to agents that share the same project memory scope."
+                        : "This item belongs to the private agent-facing memory scope."}
+                    </p>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -483,6 +617,31 @@ function RuntimeReviewPage() {
                       <p className="text-sm text-zinc-200">{formatDate(selectedMemory.updated_at)}</p>
                     </div>
                   </div>
+
+                  {selectedMetadata.length > 0 ? (
+                    <>
+                      <Separator className="bg-zinc-800" />
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-zinc-500">Metadata</p>
+                          <p className="mt-1 text-sm text-zinc-400">
+                            Runtime review uses these flags to keep scope, sensitive handling, and status visible.
+                          </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {selectedMetadata.map(([key, value]) => (
+                            <div
+                              key={key}
+                              className="rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+                            >
+                              <p className="text-xs uppercase tracking-wide text-zinc-500">{key}</p>
+                              <p className="mt-1 text-sm text-zinc-200 break-all">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
 
                   <Separator className="bg-zinc-800" />
 
@@ -514,6 +673,21 @@ function RuntimeReviewPage() {
                           <Pencil className="w-4 h-4 mr-2" />
                           {isEditing ? "Stop editing" : "Edit"}
                         </Button>
+                        {isEditing ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-zinc-700 bg-zinc-950"
+                            onClick={() => {
+                              setEditText(selectedMemory.memory);
+                              setEditReason("");
+                              setIsEditing(false);
+                            }}
+                          >
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Discard
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                     <Textarea
@@ -543,12 +717,17 @@ function RuntimeReviewPage() {
                         actions still work on the underlying memory object.
                       </p>
                     ) : null}
+                    {isEditing && isDirty ? (
+                      <p className="text-xs text-amber-300">
+                        Unsaved change detected. Saving will overwrite the current active memory text.
+                      </p>
+                    ) : null}
                   </div>
 
                   <Separator className="bg-zinc-800" />
 
                   <div className="flex flex-wrap gap-3">
-                    <Button onClick={handleSave} disabled={!isEditing || isLoading}>
+                    <Button onClick={handleSave} disabled={!isEditing || !isDirty || isLoading}>
                       {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Pencil className="w-4 h-4 mr-2" />}
                       Save Update
                     </Button>
