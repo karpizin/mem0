@@ -11,7 +11,7 @@ import { useMemoriesApi } from "@/hooks/useMemoriesApi";
 import Image from "next/image";
 import { useStats } from "@/hooks/useStats";
 import { useAppsApi } from "@/hooks/useAppsApi";
-import { Settings } from "lucide-react";
+import { Eye, Settings } from "lucide-react";
 import { useConfig } from "@/hooks/useConfig";
 
 export function Navbar() {
@@ -58,6 +58,10 @@ export function Navbar() {
     {
       match: /^\/settings$/,
       getFetchers: () => [configApi.fetchConfig],
+    },
+    {
+      match: /^\/runtime-review$/,
+      getFetchers: () => [],
     },
   ];
 
@@ -144,6 +148,18 @@ export function Navbar() {
             >
               <Settings />
               Settings
+            </Button>
+          </Link>
+          <Link href="/runtime-review">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`flex items-center gap-2 border-none ${
+                isActive("/runtime-review") ? activeClass : inactiveClass
+              }`}
+            >
+              <Eye />
+              Runtime Review
             </Button>
           </Link>
         </div>
