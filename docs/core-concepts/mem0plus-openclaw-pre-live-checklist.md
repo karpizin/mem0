@@ -20,8 +20,8 @@ make preflight
 
 - отчет вернулся со статусом `pass`
 - если нет, смотреть:
-  - [OpenClaw Pilot Runbook](./agent-memory-runtime-openclaw-pilot-runbook.md)
-  - [OpenClaw Troubleshooting Cheatsheet](./agent-memory-runtime-openclaw-troubleshooting.md)
+  - [OpenClaw Pilot Runbook](./mem0plus-openclaw-pilot-runbook.md)
+  - [OpenClaw Troubleshooting Cheatsheet](./mem0plus-openclaw-troubleshooting.md)
 
 ## 3. Прогнать synthetic gates
 
@@ -48,11 +48,11 @@ make lifecycle-eval
 Нужно иметь под рукой:
 
 - реальный `OpenClaw` config
-- 3-5 сценариев из [OpenClaw Pilot Scenarios](./agent-memory-runtime-openclaw-pilot-scenarios.md)
+- 3-5 сценариев из [OpenClaw Pilot Scenarios](./mem0plus-openclaw-pilot-scenarios.md)
 - шаблоны фиксации результатов:
-  - [Pilot Result Template](./agent-memory-runtime-openclaw-pilot-result-template.md)
-  - [Finding Template](./agent-memory-runtime-openclaw-finding-template.md)
-  - [Post-Pilot Backlog Template](./agent-memory-runtime-openclaw-post-pilot-backlog-template.md)
+  - [Pilot Result Template](./mem0plus-openclaw-pilot-result-template.md)
+  - [Finding Template](./mem0plus-openclaw-finding-template.md)
+  - [Post-Pilot Backlog Template](./mem0plus-openclaw-post-pilot-backlog-template.md)
 
 ## 6. Во время live-прогона фиксировать
 

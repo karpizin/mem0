@@ -2,7 +2,7 @@
 
 Технический дизайн первой версии автономного memory runtime поверх `mem0-core`.
 
-Документ развивает решения из [agent-memory-runtime-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1.md) и переводит их в инженерную схему реализации.
+Документ развивает решения из [mem0plus-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-v1.md) и переводит их в инженерную схему реализации.
 
 Связанный compatibility-артефакт:
 

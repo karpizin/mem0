@@ -4,12 +4,12 @@
 
 Документ опирается на:
 
-- [agent-memory-runtime-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1.md)
-- [agent-memory-runtime-product-definition-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-product-definition-v1.md)
-- [agent-memory-runtime-v1-product-gap-map.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1-product-gap-map.md)
-- [agent-memory-runtime-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-system-design-v1.md)
+- [mem0plus-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-v1.md)
+- [mem0plus-product-definition-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-product-definition-v1.md)
+- [mem0plus-v1-product-gap-map.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-v1-product-gap-map.md)
+- [mem0plus-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-system-design-v1.md)
 - [mem0plus-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-mcp-spec-v1.md)
-- [agent-memory-runtime-long-term-memory-roadmap.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-long-term-memory-roadmap.md)
+- [mem0plus-long-term-memory-roadmap.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-long-term-memory-roadmap.md)
 
 ## Статус
 
@@ -340,7 +340,7 @@
 
 Отдельно зафиксирован следующий product-facing слой:
 
-- [agent-memory-runtime-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-memory-review-surface-v1.md)
+- [mem0plus-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-memory-review-surface-v1.md)
 
 Он описывает минимальный `v1 memory review surface` поверх уже реализованного adapter contract:
 
@@ -409,7 +409,7 @@
 
 Артефакт:
 
-- `docs/core-concepts/agent-memory-runtime-openclaw-pilot-scenarios.md`
+- `docs/core-concepts/mem0plus-openclaw-pilot-scenarios.md`
 
 ## 1. Цели этапа
 
@@ -815,9 +815,9 @@ Definition of Done:
 
 Подготовленные артефакты:
 
-- `agent-memory-runtime-openclaw-pilot-result-template.md`
-- `agent-memory-runtime-openclaw-finding-template.md`
-- `agent-memory-runtime-openclaw-post-pilot-backlog-template.md`
+- `mem0plus-openclaw-pilot-result-template.md`
+- `mem0plus-openclaw-finding-template.md`
+- `mem0plus-openclaw-post-pilot-backlog-template.md`
 
 ### Phase L. Consolidation Tuning
 
@@ -1020,7 +1020,7 @@ Definition of Done:
 
 До живого pilot добавлен стандартизированный scorecard:
 
-- шаблон [agent-memory-runtime-openclaw-live-scorecard-template.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-live-scorecard-template.md)
+- шаблон [mem0plus-openclaw-live-scorecard-template.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-openclaw-live-scorecard-template.md)
 - отдельный runner `make pilot-scorecard INPUT=...`
 - summary helper считает `required_hit_rate`, `leak_free_rate`, `continuity_success_rate`, `avg_usefulness`, `avg_compactness`
 - helper выдает общий `overall_score` и verdict `pass | attention | fail`
@@ -1302,7 +1302,7 @@ Definition of Done:
 
 Подтверждение текущего объема:
 
-- добавлен design artifact `agent-memory-runtime-promotion-firewall-design.md`
+- добавлен design artifact `mem0plus-promotion-firewall-design.md`
 - `event_origin` добавлен как first-class сигнал в ingestion model
 - первый baseline-firewall демотирует risky origins в `session_only`
 - обычные `user_input` и `agent_output` события продолжают идти по стандартному durable pipeline

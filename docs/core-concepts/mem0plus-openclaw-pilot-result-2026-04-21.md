@@ -49,8 +49,8 @@
 
 ## Findings Created
 
-- `finding-1:` [agent-memory-runtime-openclaw-finding-recall-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-finding-recall-timeout-2026-04-21.md)
-- `finding-2:` [agent-memory-runtime-openclaw-finding-embedded-agent-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-finding-embedded-agent-timeout-2026-04-21.md)
+- `finding-1:` [mem0plus-openclaw-finding-recall-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-openclaw-finding-recall-timeout-2026-04-21.md)
+- `finding-2:` [mem0plus-openclaw-finding-embedded-agent-timeout-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-openclaw-finding-embedded-agent-timeout-2026-04-21.md)
 
 ## Final Assessment
 

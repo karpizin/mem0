@@ -234,7 +234,7 @@ Graph memory важна как future architecture direction, но не как �
 
 Отдельный spec для следующего шага уже зафиксирован:
 
-- [agent-memory-runtime-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-memory-review-surface-v1.md)
+- [mem0plus-memory-review-surface-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-memory-review-surface-v1.md)
 
 ## Practical Definition Of “Good v1 Product”
 

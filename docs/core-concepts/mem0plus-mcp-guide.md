@@ -16,7 +16,7 @@
 Связанные документы:
 
 - [mem0plus-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-mcp-spec-v1.md)
-- [agent-memory-runtime-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-system-design-v1.md)
+- [mem0plus-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-system-design-v1.md)
 - [memory-runtime/README.md](/Users/slava/Documents/mem0-src/memory-runtime/README.md)
 
 ## 1. Что это такое

@@ -181,8 +181,8 @@ Transfer last:
 
 Also decide separately whether to retain older time-boxed analytics documents:
 
-- `agent-memory-runtime-last-7-hours-work-summary.md`
-- `agent-memory-runtime-last-9-hours-work-summary.md`
+- `mem0plus-last-7-hours-work-summary.md`
+- `mem0plus-last-9-hours-work-summary.md`
 
 Why last:
 

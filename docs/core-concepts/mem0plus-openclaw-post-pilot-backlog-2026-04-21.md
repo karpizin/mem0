@@ -4,7 +4,7 @@
 
 - `pilot date:` `2026-04-21`
 - `pilot outcome:` `conditional-go`
-- `result document:` [agent-memory-runtime-openclaw-pilot-result-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-pilot-result-2026-04-21.md)
+- `result document:` [mem0plus-openclaw-pilot-result-2026-04-21.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-openclaw-pilot-result-2026-04-21.md)
 
 ## Backlog Table
 

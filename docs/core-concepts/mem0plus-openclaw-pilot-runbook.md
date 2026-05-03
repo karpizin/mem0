@@ -10,12 +10,12 @@
 
 Связанный артефакт:
 
-- [OpenClaw Pilot Scenarios](./agent-memory-runtime-openclaw-pilot-scenarios.md)
-- [OpenClaw Troubleshooting Cheatsheet](./agent-memory-runtime-openclaw-troubleshooting.md)
-- [Pilot Result Template](./agent-memory-runtime-openclaw-pilot-result-template.md)
-- [Finding Template](./agent-memory-runtime-openclaw-finding-template.md)
-- [Post-Pilot Backlog Template](./agent-memory-runtime-openclaw-post-pilot-backlog-template.md)
-- [Live Scorecard Template](./agent-memory-runtime-openclaw-live-scorecard-template.md)
+- [OpenClaw Pilot Scenarios](./mem0plus-openclaw-pilot-scenarios.md)
+- [OpenClaw Troubleshooting Cheatsheet](./mem0plus-openclaw-troubleshooting.md)
+- [Pilot Result Template](./mem0plus-openclaw-pilot-result-template.md)
+- [Finding Template](./mem0plus-openclaw-finding-template.md)
+- [Post-Pilot Backlog Template](./mem0plus-openclaw-post-pilot-backlog-template.md)
+- [Live Scorecard Template](./mem0plus-openclaw-live-scorecard-template.md)
 
 ## Цель пилота
 
@@ -131,7 +131,7 @@ curl http://localhost:8080/v1/observability/stats
 
 Подробный набор сценариев и ожидаемых исходов вынесен в отдельный документ:
 
-- [OpenClaw Pilot Scenarios](./agent-memory-runtime-openclaw-pilot-scenarios.md)
+- [OpenClaw Pilot Scenarios](./mem0plus-openclaw-pilot-scenarios.md)
 
 ### Сценарий 1. Bootstrap scope
 
@@ -484,13 +484,13 @@ make explain-recall ARGS="--namespace-id <namespace-id> --agent-id <agent-id> --
 
 Более короткий symptom-driven cheatsheet:
 
-- [OpenClaw Troubleshooting Cheatsheet](./agent-memory-runtime-openclaw-troubleshooting.md)
+- [OpenClaw Troubleshooting Cheatsheet](./mem0plus-openclaw-troubleshooting.md)
 
 ## Что заполнить после живого пилота
 
 Сразу после прогона полезно заполнить:
 
-- [Pilot Result Template](./agent-memory-runtime-openclaw-pilot-result-template.md)
-- [Finding Template](./agent-memory-runtime-openclaw-finding-template.md) для каждого значимого сбоя или неожиданного поведения
-- [Post-Pilot Backlog Template](./agent-memory-runtime-openclaw-post-pilot-backlog-template.md) для перевода findings в рабочий план
-- [Live Scorecard Template](./agent-memory-runtime-openclaw-live-scorecard-template.md) для сопоставимой оценки качества между прогонами
+- [Pilot Result Template](./mem0plus-openclaw-pilot-result-template.md)
+- [Finding Template](./mem0plus-openclaw-finding-template.md) для каждого значимого сбоя или неожиданного поведения
+- [Post-Pilot Backlog Template](./mem0plus-openclaw-post-pilot-backlog-template.md) для перевода findings в рабочий план
+- [Live Scorecard Template](./mem0plus-openclaw-live-scorecard-template.md) для сопоставимой оценки качества между прогонами

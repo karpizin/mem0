@@ -15,9 +15,9 @@
 
 Связанные артефакты:
 
-- [agent-memory-runtime-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1.md)
-- [agent-memory-runtime-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-system-design-v1.md)
-- [agent-memory-runtime-implementation-plan-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-implementation-plan-v1.md)
+- [mem0plus-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-v1.md)
+- [mem0plus-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-system-design-v1.md)
+- [mem0plus-implementation-plan-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-implementation-plan-v1.md)
 
 ## 1. Зачем нам MCP
 
