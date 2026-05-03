@@ -283,13 +283,13 @@
 - `selected_episode_ids` в recall trace
 - usefulness signals поверх `audit_log`
 - usefulness-aware reranking для recall candidates
-- опциональный `mem0 bridge` для external recall и sync seam
+- опциональный `core bridge` для external recall и sync seam
 
 Тестовое покрытие для этого слоя включает:
 
 - unit tests на usefulness-aware ranking
 - component tests на feedback loop через recall API
-- unit tests на `mem0 bridge` без реальной сети
+- unit tests на `core bridge` без реальной сети
 
 ### Статус `Phase I`
 
@@ -300,7 +300,7 @@
 - feedback endpoint реализован
 - recall trace возвращает stable refs на выбранные эпизоды
 - positive/negative feedback влияет на последующий ranking
-- `mem0 bridge` включается конфигом и не ломает локальный deterministic dev flow
+- `core bridge` включается конфигом и не ломает локальный deterministic dev flow
 - test suite и lint проходят
 
 ### Текущий прогресс `Phase J`

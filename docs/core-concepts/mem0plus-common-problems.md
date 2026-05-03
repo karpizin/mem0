@@ -315,7 +315,7 @@
 - строим отдельный `memory-runtime` сервис
 - даем adapter contracts
 - делаем OpenClaw/BunkerAI integration contour
-- добавили `mem0 bridge` как seam между orchestration layer и mem0 ecosystem
+- добавили `core bridge` как seam между orchestration layer и mem0 ecosystem
 
 ### Статус
 

@@ -54,7 +54,7 @@ cp .env.example .env
 
 По умолчанию локальный scaffold использует SQLite-файл для безопасного старта без внешней БД.
 Для Docker и реального runtime используется явный Postgres DSN из `.env`.
-`mem0 bridge` по умолчанию выключен и включается только явной конфигурацией.
+`core bridge` по умолчанию выключен и включается только явной конфигурацией.
 Локальные pilot/eval CLI теперь сначала используют `memory-runtime/.venv/bin/python`, если он существует, и только потом fallback-ятся на системный Python.
 Для sensitive memory policy сейчас поддерживаются два режима:
 - `reject` — безопасный режим по умолчанию; obvious secrets не попадают в durable memory
@@ -178,7 +178,7 @@ Recall observability теперь отдельно показывает performa
 - `memory_runtime_recall_latency_ms_total`
 - `memory_runtime_recall_latency_ms_max`
 `/v1/recall/feedback` записывает usefulness signals, которые потом участвуют в последующем ranking.
-При включенном `mem0 bridge` runtime может синхронизировать long-term memories в `mem0` и использовать его как внешний recall source.
+При включенном `core bridge` runtime может синхронизировать long-term memories в `mem0` и использовать его как внешний recall source.
 `POST /mcp/{client_name}/http/{user_id}` реализует stateless MCP Streamable HTTP facade поверх тех же runtime services.
 Текущий MCP surface включает:
 - `initialize`
@@ -218,7 +218,7 @@ MCP counters (`mcp_requests_total`, `mcp_tool_calls_total`, `mcp_write_tool_call
 - OpenClaw pilot e2e continuity flow
 - Prometheus-style metrics exporter and observability stats endpoint
 - recall feedback loop and usefulness-aware reranking
-- mem0 bridge unit coverage without external network dependency
+- core bridge unit coverage without external network dependency
 - idempotent ingestion for duplicate events on the same dedupe key
 - recall trace explainability with decisive selection signals
 - golden compactness regression for low-budget memory briefs

@@ -4,7 +4,7 @@
 mem0plus is a self-hosted memory module for autonomous agents.
 - It is deployed as a separate service, usually next to the agent runtime.
 - It keeps short-term and long-term memory under explicit lifecycle rules.
-- It is built on top of mem0, with orchestration, retrieval, forgetting, observability, and integrations added around it.
+- It is built on top of mem0-core primitives, with orchestration, retrieval, forgetting, observability, and integrations added around them.
 
 ---
 # Why This Exists
@@ -96,7 +96,7 @@ mem0plus is a self-hosted memory module for autonomous agents.
 - Namespaces, agents, events, recall, feedback, consolidation, lifecycle, and observability are implemented.
 - OpenClaw adapter path is implemented.
 - MCP read-first layer is implemented.
-- Local-model compatibility hardening for Ollama-style outputs has been added in mem0.
+- Local-model compatibility hardening for Ollama-style outputs has been added in the mem0plus runtime stack.
 - The next major milestone is live OpenClaw testing on a real configuration.
 
 ---

@@ -212,9 +212,9 @@ Recall уже логируется как `recall_executed`, но нет жес�
 
 Это увеличивает вероятность, что memory pipeline примет в durable store то, что должно было остаться transient или быть rejected.
 
-## 8. Влияние на mem0 bridge
+## 8. Влияние на core bridge
 
-Наш `mem0 bridge` сейчас не самый опасный участок, потому что:
+Наш `core bridge` сейчас не самый опасный участок, потому что:
 
 - sync идет из уже сформированных `memory_units`
 - в bridge sync мы используем `infer=False`

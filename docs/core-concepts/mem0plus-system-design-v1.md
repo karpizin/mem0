@@ -877,7 +877,7 @@ erDiagram
 - worker success/failure counters
 - job gauges по status
 - job gauges по type/status
-- mem0 bridge counters
+- core bridge counters
 - recall feedback counters
 
 `GET /v1/observability/stats`
@@ -896,7 +896,7 @@ Quality loop в текущей реализации:
 - feedback сохраняется в `audit_log`
 - retrieval ranking учитывает positive/negative usefulness score
 
-`mem0 bridge` в текущей реализации:
+`core bridge` в текущей реализации:
 
 - конфигурируется через environment variables
 - по умолчанию выключен

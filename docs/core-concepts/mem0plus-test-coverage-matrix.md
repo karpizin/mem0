@@ -72,7 +72,7 @@
 - `retrieval` ranking and slot behavior
 - `consolidation` service semantics
 - `lifecycle` decisions
-- `mem0 bridge` seam
+- `core bridge` seam
 - `metrics`/telemetry helpers
 - `worker main` startup behavior
 - `regression compare` harness
