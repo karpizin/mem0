@@ -1,4 +1,4 @@
-# Agent Memory Runtime Promotion Firewall Design
+# mem0plus Promotion Firewall Design
 
 ## Why This Exists
 

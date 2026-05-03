@@ -1,4 +1,4 @@
-# Agent Memory Runtime Upstream Sync Plan
+# mem0plus Upstream Sync Plan
 
 ## Goal
 

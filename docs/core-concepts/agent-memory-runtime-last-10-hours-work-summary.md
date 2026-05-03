@@ -1,4 +1,4 @@
-# Agent Memory Runtime: Summary Of Work For The Last 10 Hours
+# mem0plus: Summary Of Work For The Last 10 Hours
 
 `Время фиксации:` 2026-04-20 04:43:28 +0300  
 `Окно анализа:` последние 10 часов относительно момента фиксации  

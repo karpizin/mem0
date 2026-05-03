@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Pre-Live Checklist
+# mem0plus: OpenClaw Pre-Live Checklist
 
 Короткий checklist перед живым прогоном `OpenClaw -> memory-runtime`.
 

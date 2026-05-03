@@ -1,6 +1,6 @@
-# Mem0 Issue 4573: Impact Assessment For Agent Memory Runtime
+# Mem0 Issue 4573: Impact Assessment For mem0plus
 
-Документ фиксирует оценку влияния обсуждаемой проблемы из `mem0` issue `#4573` на текущий проект `Agent Memory Runtime`.
+Документ фиксирует оценку влияния обсуждаемой проблемы из `mem0` issue `#4573` на текущий проект `mem0plus`.
 
 Исходный контекст:
 
@@ -24,7 +24,7 @@
 
 Главный вывод:
 
-`Agent Memory Runtime` уже защищен лучше, чем “чистый mem0 как память по умолчанию”, но ключевой риск `feedback-loop / recalled-memory re-ingestion` у нас пока не закрыт как first-class механизм.
+`mem0plus` уже защищен лучше, чем “чистый mem0 как память по умолчанию”, но ключевой риск `feedback-loop / recalled-memory re-ingestion` у нас пока не закрыт как first-class механизм.
 
 Это не emergency-блокер для текущего MVP, но это серьезный риск для реального долговременного использования памяти и для качества long-term store на горизонте недель и месяцев.
 

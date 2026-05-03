@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Pilot Result
+# mem0plus: OpenClaw Pilot Result
 
 ## Pilot Metadata
 

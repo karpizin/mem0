@@ -183,7 +183,7 @@ class MCPService:
         return {
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "serverInfo": {
-                "name": "agent-memory-runtime-mcp",
+                "name": "mem0plus-mcp",
                 "version": "0.1.0",
                 "client": client_name,
                 "user": user_id,

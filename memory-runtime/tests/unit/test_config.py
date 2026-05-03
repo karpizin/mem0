@@ -31,7 +31,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(
             settings,
             Settings(
-                app_name="Agent Memory Runtime",
+                app_name="mem0plus",
                 environment="development",
                 debug=False,
                 api_prefix="/v1",

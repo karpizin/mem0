@@ -1,7 +1,7 @@
-# Agent Memory Runtime
+# mem0plus
 > Short overview deck for quick meetings
 
-Agent Memory Runtime is a dedicated memory layer for AI agents.
+mem0plus is a dedicated memory layer for AI agents.
 - It runs as a separate self-hosted service.
 - It helps agents keep continuity across sessions and tasks.
 - It turns raw history into structured, useful, and controllable memory.

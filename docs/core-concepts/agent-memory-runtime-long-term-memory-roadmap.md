@@ -1,4 +1,4 @@
-# Agent Memory Runtime Long-Term Memory Roadmap
+# mem0plus Long-Term Memory Roadmap
 
 Документ фиксирует долгосрочные направления развития памяти за пределами текущего `MVP / live-pilot` объема.
 

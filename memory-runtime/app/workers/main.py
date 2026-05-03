@@ -87,7 +87,7 @@ def run_forever(*, poll_seconds: float | None = None, max_cycles: int | None = N
 
 def main(argv: list[str] | None = None) -> int:
     configure_logging(level="DEBUG" if get_settings().debug else "INFO")
-    parser = argparse.ArgumentParser(description="Run the Agent Memory Runtime worker.")
+    parser = argparse.ArgumentParser(description="Run the mem0plus worker.")
     parser.add_argument(
         "--once",
         action="store_true",

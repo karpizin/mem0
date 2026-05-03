@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Pilot Result Template
+# mem0plus: OpenClaw Pilot Result Template
 
 Шаблон для фиксации результата одного полного pilot-прогона.
 

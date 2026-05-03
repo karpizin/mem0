@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Post-Pilot Backlog Template
+# mem0plus: OpenClaw Post-Pilot Backlog Template
 
 Шаблон для перевода pilot findings в рабочий backlog.
 

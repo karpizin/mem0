@@ -37,7 +37,7 @@ import {
 
 type ScopeFilter = "all" | "private" | "group";
 
-const STORAGE_KEY = "runtime-review-config-v1";
+const STORAGE_KEY = "mem0plus-review-config-v1";
 
 function deriveScope(memory: RuntimeReviewMemory): "private" | "group" {
   return memory.space_type === "shared-space" ? "group" : "private";
@@ -328,9 +328,9 @@ function RuntimeReviewPage() {
       <div className="container space-y-6">
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader>
-            <CardTitle className="text-white">Runtime Review</CardTitle>
+            <CardTitle className="text-white">mem0plus Review</CardTitle>
             <CardDescription>
-              Builder-facing review surface for the `memory-runtime` adapter contract.
+              Builder-facing review surface for the `mem0plus` adapter contract.
               Use it to inspect, update, forget, and mark memories incorrect across
               `private` and `group` scopes.
             </CardDescription>
@@ -379,7 +379,7 @@ function RuntimeReviewPage() {
             <div className="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-4">
               <Button onClick={handleLoadMemories} disabled={isLoading}>
                 {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />}
-                Load Review Surface
+                Load mem0plus Surface
               </Button>
               <Button
                 variant="outline"
@@ -481,7 +481,7 @@ function RuntimeReviewPage() {
                 <div className="space-y-3">
                   {filteredMemories.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-6 text-sm text-zinc-400">
-                      No memories loaded for the current review context.
+                      No memories loaded for the current mem0plus review context.
                     </div>
                   ) : (
                     filteredMemories.map((memory) => {

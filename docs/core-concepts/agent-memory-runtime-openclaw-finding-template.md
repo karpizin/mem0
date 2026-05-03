@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Finding Template
+# mem0plus: OpenClaw Finding Template
 
 Шаблон для одного конкретного finding после pilot-прогона.
 

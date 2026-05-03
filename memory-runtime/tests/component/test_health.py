@@ -21,7 +21,7 @@ class HealthEndpointTests(unittest.TestCase):
             response.json(),
             {
                 "status": "ok",
-                "service": "Agent Memory Runtime",
+                "service": "mem0plus",
                 "environment": "development",
             },
         )

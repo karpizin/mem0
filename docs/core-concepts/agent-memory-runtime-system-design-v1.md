@@ -1,4 +1,4 @@
-# Agent Memory Runtime System Design v1
+# mem0plus System Design v1
 
 Технический дизайн первой версии автономного memory runtime поверх `mem0-core`.
 
@@ -6,7 +6,7 @@
 
 Связанный compatibility-артефакт:
 
-- [agent-memory-runtime-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-mcp-spec-v1.md)
+- [mem0plus-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-mcp-spec-v1.md)
 
 ## Статус
 
@@ -143,7 +143,7 @@ sequenceDiagram
 
 Детальная спецификация MCP-слоя вынесена в отдельный документ:
 
-- `agent-memory-runtime-mcp-spec-v1.md`
+- `mem0plus-mcp-spec-v1.md`
 
 ### 5.2 Ingestion & Normalization
 

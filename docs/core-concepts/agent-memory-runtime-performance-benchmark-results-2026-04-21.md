@@ -1,4 +1,4 @@
-# Agent Memory Runtime Performance Benchmark Results
+# mem0plus Performance Benchmark Results
 
 `Date:` `2026-04-21`
 

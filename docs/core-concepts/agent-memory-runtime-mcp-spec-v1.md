@@ -1,6 +1,6 @@
-# Agent Memory Runtime MCP Spec v1
+# mem0plus MCP Spec v1
 
-Спецификация `MCP`-интерфейса для `Agent Memory Runtime`.
+Спецификация `MCP`-интерфейса для `mem0plus`.
 
 На текущий момент read-first `MCP` facade уже реализован в baseline-объеме:
 

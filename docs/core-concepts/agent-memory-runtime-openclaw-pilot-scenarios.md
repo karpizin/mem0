@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Pilot Scenarios
+# mem0plus: OpenClaw Pilot Scenarios
 
 Набор целевых pilot-сценариев для первого живого прогона `OpenClaw -> memory-runtime`.
 

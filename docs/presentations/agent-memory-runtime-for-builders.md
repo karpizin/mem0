@@ -1,7 +1,7 @@
-# Agent Memory Runtime
+# mem0plus
 > Developer presentation for teams integrating the project into their own agent systems
 
-Agent Memory Runtime is a self-hosted memory module for autonomous agents.
+mem0plus is a self-hosted memory module for autonomous agents.
 - It is deployed as a separate service, usually next to the agent runtime.
 - It keeps short-term and long-term memory under explicit lifecycle rules.
 - It is built on top of mem0, with orchestration, retrieval, forgetting, observability, and integrations added around it.

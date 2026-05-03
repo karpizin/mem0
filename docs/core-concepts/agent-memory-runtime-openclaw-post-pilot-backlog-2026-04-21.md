@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Post-Pilot Backlog
+# mem0plus: OpenClaw Post-Pilot Backlog
 
 ## Pilot Context
 

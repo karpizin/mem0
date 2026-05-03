@@ -1,6 +1,8 @@
-# Memory Runtime
+# mem0plus
 
-`memory-runtime` — отдельный сервисный контур для `Agent Memory Runtime`, который строится поверх `mem0-core`.
+`memory-runtime` — отдельный сервисный контур для `mem0plus`, который строится поверх `mem0-core`.
+
+На этом этапе `mem0plus` — это product/runtime name, а каталог `memory-runtime/` пока сохраняется как технический путь для совместимости с текущими скриптами, Docker и pilot tooling.
 
 На текущем этапе это scaffold первой версии сервиса:
 
@@ -105,7 +107,7 @@ Readiness baseline теперь включает:
 
 Для первого живого MVP-пилота с `OpenClaw` смотри runbook:
 - [agent-memory-runtime-openclaw-pilot-runbook.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-openclaw-pilot-runbook.md)
-- Для практического использования MCP смотри [agent-memory-runtime-mcp-guide.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-mcp-guide.md)
+- Для практического использования MCP смотри [mem0plus-mcp-guide.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-mcp-guide.md)
 
 ## API surface
 

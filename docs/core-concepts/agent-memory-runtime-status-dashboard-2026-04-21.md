@@ -1,4 +1,4 @@
-# Agent Memory Runtime Status Dashboard
+# mem0plus Status Dashboard
 
 `Date:` `2026-04-21`
 

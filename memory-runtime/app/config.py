@@ -13,7 +13,7 @@ def _to_bool(value: str | None, default: bool = False) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
-    app_name: str = "Agent Memory Runtime"
+    app_name: str = "mem0plus"
     environment: str = "development"
     debug: bool = False
     api_prefix: str = "/v1"
@@ -42,7 +42,7 @@ def get_settings() -> Settings:
     if sensitive_policy not in {"reject", "mark"}:
         sensitive_policy = "reject"
     return Settings(
-        app_name=os.getenv("MEMORY_RUNTIME_APP_NAME", "Agent Memory Runtime"),
+        app_name=os.getenv("MEMORY_RUNTIME_APP_NAME", "mem0plus"),
         environment=os.getenv("MEMORY_RUNTIME_ENV", "development"),
         debug=_to_bool(os.getenv("MEMORY_RUNTIME_DEBUG"), default=False),
         api_prefix=os.getenv("MEMORY_RUNTIME_API_PREFIX", "/v1"),

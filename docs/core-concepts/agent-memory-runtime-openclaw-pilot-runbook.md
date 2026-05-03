@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Pilot Runbook
+# mem0plus: OpenClaw Pilot Runbook
 
 Практический runbook для первого `OpenClaw-only` MVP-пилота.
 

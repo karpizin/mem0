@@ -1,4 +1,4 @@
-# Agent Memory Runtime: Test Coverage Matrix
+# mem0plus: Test Coverage Matrix
 
 Документ фиксирует текущую полноту тестового контура `memory-runtime` перед первым живым `OpenClaw` пилотом.
 

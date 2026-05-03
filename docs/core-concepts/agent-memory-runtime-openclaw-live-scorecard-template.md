@@ -1,4 +1,4 @@
-# Agent Memory Runtime: OpenClaw Live Pilot Scorecard Template
+# mem0plus: OpenClaw Live Pilot Scorecard Template
 
 Используй этот scorecard сразу после живого прогона, чтобы фиксировать не только впечатления, но и сопоставимые метрики качества.
 

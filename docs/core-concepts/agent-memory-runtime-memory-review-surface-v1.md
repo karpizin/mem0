@@ -1,8 +1,8 @@
-# Agent Memory Runtime: Memory Review Surface V1
+# mem0plus: Memory Review Surface V1
 
 ## Purpose
 
-Этот документ фиксирует минимальный `memory review surface` для `Agent Memory Runtime v1`.
+Этот документ фиксирует минимальный `memory review surface` для `mem0plus v1`.
 
 Цель review-surface не в том, чтобы превратить память в ручную knowledge base, а в том, чтобы дать пользователю и оператору `минимально достаточный control layer`:
 

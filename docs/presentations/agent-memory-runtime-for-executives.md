@@ -1,4 +1,4 @@
-# Agent Memory Runtime
+# mem0plus
 > Executive and investor presentation
 
 We are building a dedicated memory layer for AI agents.

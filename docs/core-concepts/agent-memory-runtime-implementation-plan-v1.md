@@ -1,6 +1,6 @@
-# Agent Memory Runtime Implementation Plan v1
+# mem0plus Implementation Plan v1
 
-План реализации первой версии `Agent Memory Runtime` как отдельного сервиса поверх `mem0-core`.
+План реализации первой версии `mem0plus` как отдельного сервиса поверх `mem0-core`.
 
 Документ опирается на:
 
@@ -8,7 +8,7 @@
 - [agent-memory-runtime-product-definition-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-product-definition-v1.md)
 - [agent-memory-runtime-v1-product-gap-map.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-v1-product-gap-map.md)
 - [agent-memory-runtime-system-design-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-system-design-v1.md)
-- [agent-memory-runtime-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-mcp-spec-v1.md)
+- [mem0plus-mcp-spec-v1.md](/Users/slava/Documents/mem0-src/docs/core-concepts/mem0plus-mcp-spec-v1.md)
 - [agent-memory-runtime-long-term-memory-roadmap.md](/Users/slava/Documents/mem0-src/docs/core-concepts/agent-memory-runtime-long-term-memory-roadmap.md)
 
 ## Статус
@@ -1277,7 +1277,7 @@ Definition of Done:
 
 Связанный артефакт:
 
-- `agent-memory-runtime-mcp-spec-v1.md`
+- `mem0plus-mcp-spec-v1.md`
 
 ### Phase P. Promotion Firewall And Provenance
 
